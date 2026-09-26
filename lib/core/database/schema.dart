@@ -1,0 +1,21 @@
+const databaseVersion = 2;
+
+const schemaStatements = <String>[
+  '''CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL, binance_email TEXT, enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)''',
+  '''CREATE TABLE account_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL REFERENCES accounts(id), btc_balance TEXT NOT NULL, usdt_balance TEXT NOT NULL, btc_price TEXT NOT NULL, equity_usdt TEXT NOT NULL, source TEXT NOT NULL, captured_at TEXT NOT NULL)''',
+  '''CREATE TABLE orders (id INTEGER PRIMARY KEY AUTOINCREMENT, client_order_id TEXT NOT NULL UNIQUE, exchange_order_id TEXT UNIQUE, account_id INTEGER NOT NULL REFERENCES accounts(id), symbol TEXT NOT NULL, side TEXT NOT NULL, order_type TEXT NOT NULL, status TEXT NOT NULL, requested_quantity TEXT NOT NULL, executed_quantity TEXT NOT NULL DEFAULT '0', quote_quantity TEXT NOT NULL DEFAULT '0', reason TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)''',
+  '''CREATE TABLE trades (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL REFERENCES orders(id), exchange_trade_id TEXT NOT NULL UNIQUE, price TEXT NOT NULL, btc_quantity TEXT NOT NULL, usdt_quantity TEXT NOT NULL, fee_asset TEXT NOT NULL, fee_amount TEXT NOT NULL, btc_weight_before TEXT, btc_weight_after TEXT, executed_at TEXT NOT NULL)''',
+  '''CREATE TABLE transfers (id INTEGER PRIMARY KEY AUTOINCREMENT, client_transfer_id TEXT NOT NULL UNIQUE, exchange_transfer_id TEXT UNIQUE, from_account_id INTEGER REFERENCES accounts(id), to_account_id INTEGER REFERENCES accounts(id), asset TEXT NOT NULL, amount TEXT NOT NULL, before_balance TEXT, after_balance TEXT, transfer_type TEXT NOT NULL, status TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, note TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)''',
+  '''CREATE TABLE deposits (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL REFERENCES accounts(id), exchange_id TEXT UNIQUE, asset TEXT NOT NULL, amount TEXT NOT NULL, status TEXT NOT NULL, occurred_at TEXT NOT NULL)''',
+  '''CREATE TABLE withdrawals (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL REFERENCES accounts(id), exchange_id TEXT UNIQUE, asset TEXT NOT NULL, amount TEXT NOT NULL, fee TEXT NOT NULL DEFAULT '0', status TEXT NOT NULL, occurred_at TEXT NOT NULL)''',
+  '''CREATE TABLE strategy_events (id INTEGER PRIMARY KEY AUTOINCREMENT, event_type TEXT NOT NULL, state_from TEXT, state_to TEXT, reason TEXT NOT NULL, payload_json TEXT, correlation_id TEXT, created_at TEXT NOT NULL)''',
+  '''CREATE TABLE strategy_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, value_type TEXT NOT NULL, updated_at TEXT NOT NULL)''',
+  '''CREATE TABLE portfolio_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, btc_price TEXT NOT NULL, btc_quantity TEXT NOT NULL, usdt_quantity TEXT NOT NULL, equity_usdt TEXT NOT NULL, btc_weight TEXT NOT NULL, initial_capital TEXT NOT NULL, net_deposits TEXT NOT NULL, net_withdrawals TEXT NOT NULL, trading_pnl TEXT NOT NULL, total_fees TEXT NOT NULL, captured_at TEXT NOT NULL)''',
+  '''CREATE TABLE profit_withdrawals (id INTEGER PRIMARY KEY AUTOINCREMENT, transfer_id INTEGER NOT NULL UNIQUE REFERENCES transfers(id), strategy_trade_id INTEGER REFERENCES trades(id), btc_price TEXT NOT NULL, strategy_equity TEXT NOT NULL, high_water_mark TEXT NOT NULL, new_profit TEXT NOT NULL, withdrawal_ratio TEXT NOT NULL, actual_amount TEXT NOT NULL, created_at TEXT NOT NULL)''',
+  '''CREATE TABLE high_water_marks (id INTEGER PRIMARY KEY AUTOINCREMENT, value_usdt TEXT NOT NULL, adjusted_equity_usdt TEXT NOT NULL, reason TEXT NOT NULL, effective_at TEXT NOT NULL)''',
+  '''CREATE TABLE system_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, level TEXT NOT NULL, component TEXT NOT NULL, message TEXT NOT NULL, context_json TEXT, created_at TEXT NOT NULL)''',
+  'CREATE INDEX idx_snapshots_account_time ON account_snapshots(account_id, captured_at)',
+  'CREATE INDEX idx_orders_account_status ON orders(account_id, status)',
+  'CREATE INDEX idx_transfers_created_at ON transfers(created_at)',
+  'CREATE INDEX idx_events_created_at ON strategy_events(created_at)',
+];
