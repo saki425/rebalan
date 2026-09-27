@@ -236,7 +236,22 @@ class _DashboardPageState extends State<DashboardPage> {
       _liveRuntime = live;
       _liveSubscription = live.events.listen((event) {
         if (!mounted) return;
-        setState(() => _startupMessage = 'LIVE ${event.state}：${event.reason}');
+        final status = switch (event.state) {
+          'NO_TRADE' || 'LIVE_RECONCILED' => StrategyStatus.running,
+          'ORDER_SUBMITTED' => StrategyStatus.waitingOrder,
+          'PARTIALLY_FILLED' => StrategyStatus.waitingOrder,
+          'FILLED' => StrategyStatus.running,
+          'LIVE_PAUSED' => StrategyStatus.paused,
+          'WEBSOCKET_DISCONNECTED' => StrategyStatus.websocketDisconnected,
+          'LIVE_ERROR' => StrategyStatus.apiError,
+          _ => null,
+        };
+        setState(() {
+          _startupMessage = 'LIVE ${event.state}：${event.reason}';
+          if (status != null && _snapshot != null) {
+            _snapshot = _withStrategyStatus(_snapshot!, status);
+          }
+        });
       });
       if (mounted) setState(() => _startupMessage = 'LIVE 已启动：真实策略检查已开始');
     } catch (error) {
