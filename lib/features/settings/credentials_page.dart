@@ -83,8 +83,16 @@ class _CredentialsPageState extends State<CredentialsPage> {
                 accountEmail: email.text.trim(),
               );
               if (!credentials.isValid) return;
-              await widget.store.save(role, credentials);
-              if (context.mounted) Navigator.pop(context, true);
+              try {
+                await widget.store.save(role, credentials);
+                if (context.mounted) Navigator.pop(context, true);
+              } catch (error) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('保存失败：$error')),
+                  );
+                }
+              }
             },
             child: const Text('安全保存'),
           ),
@@ -139,7 +147,7 @@ class _CredentialsPageState extends State<CredentialsPage> {
           child: Padding(
             padding: EdgeInsets.all(16),
             child: Text(
-              '凭据仅保存到系统 Keychain/Keystore，不写入 SQLite、日志或 Git。建议启用 Binance IP 白名单并关闭提现权限。',
+              '凭据保存到本机 SharedPreferences，不写入 SQLite、日志或 Git。建议启用 Binance IP 白名单并关闭提现权限。',
             ),
           ),
         ),
