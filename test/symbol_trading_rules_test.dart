@@ -55,4 +55,37 @@ void main() {
       Decimal.parse('0.00010000'),
     );
   });
+
+  test('falls back to LOT_SIZE when MARKET_LOT_SIZE has zero step', () {
+    final info = {
+      'symbols': [
+        {
+          'symbol': 'BTCUSDT',
+          'filters': [
+            {
+              'filterType': 'MARKET_LOT_SIZE',
+              'minQty': '0.00000000',
+              'maxQty': '102.21036804',
+              'stepSize': '0.00000000',
+            },
+            {
+              'filterType': 'LOT_SIZE',
+              'minQty': '0.00001000',
+              'maxQty': '9000',
+              'stepSize': '0.00001000',
+            },
+            {'filterType': 'NOTIONAL', 'minNotional': '5'},
+          ],
+        },
+      ],
+    };
+    final rules = SymbolTradingRules.fromExchangeInfo(info, 'BTCUSDT');
+    expect(
+      rules.validateAndNormalize(
+        requestedQuantity: Decimal.parse('0.0043887963'),
+        referencePrice: Decimal.parse('100000'),
+      ),
+      Decimal.parse('0.00438000'),
+    );
+  });
 }

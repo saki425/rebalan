@@ -34,7 +34,14 @@ class SymbolTradingRules {
       return null;
     }
 
-    final lot = filter('MARKET_LOT_SIZE') ?? filter('LOT_SIZE');
+    // Some Binance symbols expose MARKET_LOT_SIZE with minQty/stepSize = 0.
+    // That filter cannot be used to normalize a market quantity; fall back to
+    // LOT_SIZE in that case.
+    final marketLot = filter('MARKET_LOT_SIZE');
+    final marketStep = _decimal(marketLot?['stepSize']);
+    final lot = marketLot != null && marketStep > Decimal.zero
+        ? marketLot
+        : filter('LOT_SIZE');
     if (lot == null) {
       throw SymbolRulesException('$symbol has no quantity filter');
     }
