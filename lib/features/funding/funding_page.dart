@@ -188,6 +188,11 @@ class _FundingPageState extends State<FundingPage> {
       final (fundingId, _, credentials, _) = await _liveContext(database);
       client = BinanceLiveClient(credentials: credentials);
       await client.synchronizeTime();
+      final restrictions = await client.apiRestrictions();
+      if (restrictions['enableSpotAndMarginTrading'] != true ||
+          restrictions['enableWithdrawals'] == true) {
+        throw StateError('Funding API 权限不安全：需要开启现货交易并关闭提现权限');
+      }
       final response =
           await LiveExecutionService(
             database: database,
