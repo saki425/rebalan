@@ -10,9 +10,11 @@ import 'credential_store.dart';
 import 'live_strategy_runner.dart';
 import 'live_reconciliation_service.dart';
 import 'live_execution_service.dart';
+import 'live_transfer_reconciliation_service.dart';
 import '../performance/high_water_mark_manager.dart';
 import '../performance/high_water_mark_repository.dart';
 import '../portfolio/portfolio_manager.dart';
+import '../accounts/account_read_client.dart';
 import '../profit/profit_manager.dart';
 import '../strategy/rebalance_engine.dart';
 
@@ -25,6 +27,7 @@ class LiveRuntimeCoordinator {
     required this.credentials,
     required this.accountId,
     required this.config,
+    this.accountBalances,
   });
 
   final Database database;
@@ -32,6 +35,7 @@ class LiveRuntimeCoordinator {
   final BinanceCredentials credentials;
   final int accountId;
   final LiveRuntimeConfig config;
+  final AccountBalanceSource? accountBalances;
   final _events = StreamController<LiveRuntimeEvent>.broadcast();
   Timer? _timer;
   BinanceLiveClient? _client;
@@ -75,6 +79,11 @@ class LiveRuntimeCoordinator {
         database: database,
         client: client,
       ).reconcile();
+      await LiveTransferReconciliationService(
+        database: database,
+        client: client,
+      ).reconcileUnknownTransfers();
+      await _reconcileAllBalances(client);
       if (!reconciliation.ok) {
         _paused = true;
         _emit('LIVE_PAUSED', reconciliation.reason);
@@ -117,6 +126,11 @@ class LiveRuntimeCoordinator {
           database: database,
           client: _client!,
         ).reconcile();
+        await LiveTransferReconciliationService(
+          database: database,
+          client: _client!,
+        ).reconcileUnknownTransfers();
+        await _reconcileAllBalances(_client!);
         if (!reconciliation.ok) {
           _paused = true;
           _emit('LIVE_PAUSED', reconciliation.reason);
@@ -131,6 +145,7 @@ class LiveRuntimeCoordinator {
       final account = await _readStrategyAccount(_client!);
       _log(
           'check price=${market.price} BTC=${account.btc} USDT=${account.usdt}');
+      await _savePortfolioSnapshot(account, market.price);
       await _observeHighWaterMark(account, market.price);
       final result = await _runner!.check(
         strategyAccount: account,
@@ -222,6 +237,46 @@ class LiveRuntimeCoordinator {
       transferType: 'PROFIT_WITHDRAWAL',
       note: 'LIVE_FILLED_SELL:${result.orderId}',
     );
+    final transferRows = await database.query(
+      'transfers',
+      columns: ['id'],
+      where: 'idempotency_key = ?',
+      whereArgs: ['profit-${result.orderId}-${decision.transferAmount}'],
+      limit: 1,
+    );
+    if (transferRows.isNotEmpty) {
+      final orderRows = await database.query(
+        'orders',
+        columns: ['id'],
+        where: 'exchange_order_id = ?',
+        whereArgs: [result.orderId],
+        limit: 1,
+      );
+      final tradeRows = orderRows.isEmpty
+          ? const <Map<String, Object?>>[]
+          : await database.query(
+              'trades',
+              columns: ['id'],
+              where: 'order_id = ?',
+              whereArgs: [orderRows.single['id']],
+              limit: 1,
+            );
+      await database.insert(
+          'profit_withdrawals',
+          {
+            'transfer_id': transferRows.single['id'],
+            'strategy_trade_id':
+                tradeRows.isEmpty ? null : tradeRows.single['id'],
+            'btc_price': price.toString(),
+            'strategy_equity': decision.currentEquity.toString(),
+            'high_water_mark': decision.highWaterMark.toString(),
+            'new_profit': decision.newProfit.toString(),
+            'withdrawal_ratio': config.profitWithdrawalRatio.toString(),
+            'actual_amount': decision.transferAmount.toString(),
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
     final now = DateTime.now().toUtc();
     _highWaterMark!.crystallize(
       equityBeforeWithdrawal: decision.currentEquity,
@@ -314,6 +369,71 @@ class LiveRuntimeCoordinator {
         name: 'Strategy Account',
         btc: balance('BTC'),
         usdt: balance('USDT'));
+  }
+
+  Future<void> _reconcileAllBalances(BinanceLiveClient client) async {
+    final source = accountBalances;
+    if (source == null) return;
+    final balances = await source.fetchBalances();
+    final rows = await database.query('accounts', columns: ['id', 'role']);
+    final ids = {
+      for (final row in rows) row['role'] as String: row['id'] as int
+    };
+    final price = marketData.current.price;
+    if (price <= Decimal.zero)
+      throw StateError('REST balance reconcile needs price');
+    final now = DateTime.now().toUtc().toIso8601String();
+    final batch = database.batch();
+    for (final balance in balances) {
+      final id = ids[balance.role.name.toUpperCase()];
+      if (id == null)
+        throw StateError('Missing local account ${balance.role.name}');
+      batch.insert('account_snapshots', {
+        'account_id': id,
+        'btc_balance': balance.btc.toString(),
+        'usdt_balance': balance.usdt.toString(),
+        'btc_price': price.toString(),
+        'equity_usdt': balance.equity(price).toString(),
+        'source': 'LIVE_REST_RECONCILE',
+        'captured_at': now,
+      });
+    }
+    await batch.commit(noResult: true);
+    _log('all account balances reconciled count=${balances.length}');
+  }
+
+  Future<void> _savePortfolioSnapshot(
+    AccountBalance account,
+    Decimal price,
+  ) async {
+    final equity = account.equity(price);
+    final first = await database.query(
+      'portfolio_snapshots',
+      columns: ['initial_capital'],
+      orderBy: 'captured_at ASC, id ASC',
+      limit: 1,
+    );
+    final initial = first.isEmpty
+        ? equity
+        : Decimal.parse(first.single['initial_capital'] as String);
+    final feeRows = await database.query('trades', columns: ['fee_amount']);
+    final fees = feeRows.fold(
+      Decimal.zero,
+      (sum, row) => sum + Decimal.parse(row['fee_amount'] as String),
+    );
+    await database.insert('portfolio_snapshots', {
+      'btc_price': price.toString(),
+      'btc_quantity': account.btc.toString(),
+      'usdt_quantity': account.usdt.toString(),
+      'equity_usdt': equity.toString(),
+      'btc_weight': account.btcWeight(price).toString(),
+      'initial_capital': initial.toString(),
+      'net_deposits': '0',
+      'net_withdrawals': '0',
+      'trading_pnl': (equity - initial).toString(),
+      'total_fees': fees.toString(),
+      'captured_at': DateTime.now().toUtc().toIso8601String(),
+    });
   }
 
   Future<void> stop() async {

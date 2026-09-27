@@ -6,9 +6,9 @@ class BinanceSigner {
   const BinanceSigner();
 
   String sign(String payload, String secretKey) => Hmac(
-    sha256,
-    utf8.encode(secretKey),
-  ).convert(utf8.encode(payload)).toString();
+        sha256,
+        utf8.encode(secretKey),
+      ).convert(utf8.encode(payload)).toString();
 
   String encodeParameters(Map<String, String> parameters) => parameters.entries
       .map(

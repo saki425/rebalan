@@ -31,7 +31,8 @@ class SecureCredentialStore implements CredentialStore {
     final storage = await SharedPreferences.getInstance();
     await storage.setString(_key(role, 'api_key'), credentials.apiKey);
     await storage.setString(_key(role, 'secret_key'), credentials.secretKey);
-    await storage.setString(_key(role, 'account_email'), credentials.accountEmail);
+    await storage.setString(
+        _key(role, 'account_email'), credentials.accountEmail);
   }
 
   @override

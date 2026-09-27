@@ -86,9 +86,9 @@ class DashboardRepository {
       limit: 1,
     );
     Decimal sum(List<Map<String, Object?>> rows, String column) => rows.fold(
-      Decimal.zero,
-      (total, row) => total + Decimal.parse(row[column] as String),
-    );
+          Decimal.zero,
+          (total, row) => total + Decimal.parse(row[column] as String),
+        );
     return _DashboardMetrics(
       profitWithdrawn: sum(profitRows, 'actual_amount'),
       totalFees: sum(feeRows, 'fee_amount'),
@@ -99,49 +99,61 @@ class DashboardRepository {
   }
 
   static DashboardSnapshot demoSnapshot({StrategyConfig? config}) => _snapshot(
-    accounts: [
-      AccountBalance(
-        role: AccountRole.funding,
-        name: 'Funding Account',
-        btc: Decimal.parse('0.33333333'),
-        usdt: Decimal.parse('10000'),
-      ),
-      AccountBalance(
-        role: AccountRole.strategy,
-        name: 'Strategy Account',
-        btc: Decimal.parse('1.16666667'),
-        usdt: Decimal.parse('50000'),
-      ),
-      AccountBalance(
-        role: AccountRole.profit,
-        name: 'Profit Account',
-        btc: Decimal.zero,
-        usdt: Decimal.parse('50000'),
-        totalProfitReceived: Decimal.parse('50000'),
-      ),
-    ],
-    isDemo: true,
-    config: config,
-  );
+        accounts: [
+          AccountBalance(
+            role: AccountRole.funding,
+            name: 'Funding Account',
+            btc: Decimal.zero,
+            usdt: Decimal.zero,
+          ),
+          AccountBalance(
+            role: AccountRole.strategy,
+            name: 'Strategy Account',
+            btc: Decimal.zero,
+            usdt: Decimal.zero,
+          ),
+          AccountBalance(
+            role: AccountRole.profit,
+            name: 'Profit Account',
+            btc: Decimal.zero,
+            usdt: Decimal.zero,
+            totalProfitReceived: Decimal.zero,
+          ),
+        ],
+        isDemo: true,
+        config: config,
+      );
 
   /// No synthetic balances are shown before all real account credentials exist.
   static DashboardSnapshot emptySnapshot({StrategyConfig? config}) => _snapshot(
-    accounts: [
-      AccountBalance(role: AccountRole.funding, name: 'Funding Account', btc: Decimal.zero, usdt: Decimal.zero),
-      AccountBalance(role: AccountRole.strategy, name: 'Strategy Account', btc: Decimal.zero, usdt: Decimal.zero),
-      AccountBalance(role: AccountRole.profit, name: 'Profit Account', btc: Decimal.zero, usdt: Decimal.zero),
-    ],
-    isDemo: true,
-    config: config,
-    btcPrice: Decimal.zero,
-    change24h: Decimal.zero,
-    strategyProfit: Decimal.zero,
-    profitWithdrawn: Decimal.zero,
-    highWaterMark: Decimal.zero,
-    maxDrawdown: Decimal.zero,
-    cagr: Decimal.zero,
-    totalFees: Decimal.zero,
-  );
+        accounts: [
+          AccountBalance(
+              role: AccountRole.funding,
+              name: 'Funding Account',
+              btc: Decimal.zero,
+              usdt: Decimal.zero),
+          AccountBalance(
+              role: AccountRole.strategy,
+              name: 'Strategy Account',
+              btc: Decimal.zero,
+              usdt: Decimal.zero),
+          AccountBalance(
+              role: AccountRole.profit,
+              name: 'Profit Account',
+              btc: Decimal.zero,
+              usdt: Decimal.zero),
+        ],
+        isDemo: true,
+        config: config,
+        btcPrice: Decimal.zero,
+        change24h: Decimal.zero,
+        strategyProfit: Decimal.zero,
+        profitWithdrawn: Decimal.zero,
+        highWaterMark: Decimal.zero,
+        maxDrawdown: Decimal.zero,
+        cagr: Decimal.zero,
+        totalFees: Decimal.zero,
+      );
 
   static DashboardSnapshot _snapshot({
     required List<AccountBalance> accounts,
@@ -156,23 +168,25 @@ class DashboardRepository {
     Decimal? maxDrawdown,
     Decimal? cagr,
     Decimal? totalFees,
-  }) => DashboardSnapshot(
-    btcPrice: btcPrice ?? Decimal.parse('60000'),
-    change24h: change24h ?? Decimal.parse('0.0248'),
-    websocketStatus: ConnectionStatus.unknown,
-    apiStatus: ConnectionStatus.unknown,
-    lastRestCalibration: null,
-    accounts: accounts,
-    strategyStatus: StrategyStatus.paused,
-    config: config ?? StrategyConfig.defaults(),
-    strategyProfit: strategyProfit ?? Decimal.parse('5000'),
-    profitWithdrawn: profitWithdrawn ?? metrics?.profitWithdrawn ?? Decimal.parse('50000'),
-    highWaterMark: highWaterMark ?? metrics?.highWaterMark ?? Decimal.parse('120000'),
-    maxDrawdown: maxDrawdown ?? Decimal.parse('0.084'),
-    cagr: cagr ?? Decimal.parse('0.126'),
-    totalFees: totalFees ?? metrics?.totalFees ?? Decimal.parse('138.42'),
-    isDemo: isDemo,
-  );
+  }) =>
+      DashboardSnapshot(
+        btcPrice: btcPrice ?? Decimal.zero,
+        change24h: change24h ?? Decimal.zero,
+        websocketStatus: ConnectionStatus.unknown,
+        apiStatus: ConnectionStatus.unknown,
+        lastRestCalibration: null,
+        accounts: accounts,
+        strategyStatus: StrategyStatus.paused,
+        config: config ?? StrategyConfig.defaults(),
+        strategyProfit: strategyProfit ?? Decimal.zero,
+        profitWithdrawn:
+            profitWithdrawn ?? metrics?.profitWithdrawn ?? Decimal.zero,
+        highWaterMark: highWaterMark ?? metrics?.highWaterMark ?? Decimal.zero,
+        maxDrawdown: maxDrawdown ?? Decimal.zero,
+        cagr: cagr ?? Decimal.zero,
+        totalFees: totalFees ?? metrics?.totalFees ?? Decimal.zero,
+        isDemo: isDemo,
+      );
 }
 
 class _DashboardMetrics {

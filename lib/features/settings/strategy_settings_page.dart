@@ -94,49 +94,62 @@ class _StrategySettingsPageState extends State<StrategySettingsPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('系统参数')),
-    body: _error != null
-        ? Center(child: Text(_error!))
-        : _values == null
-        ? const Center(child: CircularProgressIndicator())
-        : ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              const Card(
-                child: ListTile(
-                  leading: Icon(Icons.shield_outlined),
-                  title: Text('运行模式：PAPER'),
-                  subtitle: Text('LIVE 必须通过 Paper 验证与安全门，不能在参数页直接开启。'),
-                ),
-              ),
-              const SizedBox(height: 12),
-              for (final entry in _decimalFields.entries)
-                Card(
-                  child: ListTile(
-                    title: Text(entry.value),
-                    trailing: Text(_values![entry.key] ?? '—'),
-                    onTap: () => _edit(entry.key, entry.value, false),
+        appBar: AppBar(title: const Text('系统参数')),
+        body: _error != null
+            ? Center(child: Text(_error!))
+            : _values == null
+                ? const Center(child: CircularProgressIndicator())
+                : ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.shield_outlined),
+                          title: Text('运行模式：${_values!['runMode'] ?? 'PAPER'}'),
+                          subtitle: const Text(
+                            'PAPER / LIVE_TEST / LIVE。LIVE 重启后必须重新人工确认。',
+                          ),
+                          onTap: () {
+                            final current = _values!['runMode'] ?? 'PAPER';
+                            final next = switch (current) {
+                              'PAPER' => 'LIVE_TEST',
+                              'LIVE_TEST' => 'LIVE',
+                              _ => 'PAPER',
+                            };
+                            widget.repository
+                                .save('runMode', next)
+                                .then((_) => _load());
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      for (final entry in _decimalFields.entries)
+                        Card(
+                          child: ListTile(
+                            title: Text(entry.value),
+                            trailing: Text(_values![entry.key] ?? '—'),
+                            onTap: () => _edit(entry.key, entry.value, false),
+                          ),
+                        ),
+                      for (final entry in _integerFields.entries)
+                        Card(
+                          child: ListTile(
+                            title: Text(entry.value),
+                            trailing: Text(_values![entry.key] ?? '—'),
+                            onTap: () => _edit(entry.key, entry.value, true),
+                          ),
+                        ),
+                      for (final entry in _booleanFields.entries)
+                        Card(
+                          child: SwitchListTile(
+                            title: Text(entry.value),
+                            value: _values![entry.key] == 'true',
+                            onChanged: (value) => _toggle(entry.key, value),
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-              for (final entry in _integerFields.entries)
-                Card(
-                  child: ListTile(
-                    title: Text(entry.value),
-                    trailing: Text(_values![entry.key] ?? '—'),
-                    onTap: () => _edit(entry.key, entry.value, true),
-                  ),
-                ),
-              for (final entry in _booleanFields.entries)
-                Card(
-                  child: SwitchListTile(
-                    title: Text(entry.value),
-                    value: _values![entry.key] == 'true',
-                    onChanged: (value) => _toggle(entry.key, value),
-                  ),
-                ),
-            ],
-          ),
-  );
+      );
 }
 
 /// Owns its controller for the entire lifetime of the dialog route.  The
@@ -177,37 +190,37 @@ class _ParameterEditorState extends State<_ParameterEditor> {
 
   @override
   Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Align(alignment: Alignment.centerLeft, child: Text(widget.label)),
-      const SizedBox(height: 12),
-      TextField(
-        controller: _controller,
-        autofocus: true,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        decoration: const InputDecoration(border: OutlineInputBorder()),
-      ),
-      const SizedBox(height: 16),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+          Align(alignment: Alignment.centerLeft, child: Text(widget.label)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(border: OutlineInputBorder()),
           ),
-          const SizedBox(width: 8),
-          FilledButton(
-            onPressed: () {
-              final text = _controller.text.trim();
-              final valid = widget.integer
-                  ? int.tryParse(text) != null && int.parse(text) > 0
-                  : widget.validDecimal(text);
-              if (valid) Navigator.pop(context, text);
-            },
-            child: const Text('保存'),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('取消'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: () {
+                  final text = _controller.text.trim();
+                  final valid = widget.integer
+                      ? int.tryParse(text) != null && int.parse(text) > 0
+                      : widget.validDecimal(text);
+                  if (valid) Navigator.pop(context, text);
+                },
+                child: const Text('保存'),
+              ),
+            ],
           ),
         ],
-      ),
-    ],
-  );
+      );
 }

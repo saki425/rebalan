@@ -203,6 +203,21 @@ class BinanceLiveClient {
     return '${json['txnId'] ?? json['tranId']}';
   }
 
+  Future<List<Map<String, dynamic>>> universalTransferHistory({
+    String? clientTransferId,
+    String? fromEmail,
+    String? toEmail,
+  }) async {
+    final rows =
+        await _signedList('GET', '/sapi/v1/sub-account/universalTransfer', {
+      if (clientTransferId != null) 'clientTranId': clientTransferId,
+      if (fromEmail != null) 'fromEmail': fromEmail,
+      if (toEmail != null) 'toEmail': toEmail,
+      'limit': '100',
+    });
+    return rows.cast<Map<String, dynamic>>();
+  }
+
   Future<List<dynamic>> _signedList(
     String method,
     String path,

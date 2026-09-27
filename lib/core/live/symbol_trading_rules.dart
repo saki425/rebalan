@@ -19,14 +19,14 @@ class SymbolTradingRules {
     Map<String, dynamic> exchangeInfo,
     String symbol,
   ) {
-    final symbols = (exchangeInfo['symbols'] as List<dynamic>)
-        .cast<Map<String, dynamic>>();
+    final symbols =
+        (exchangeInfo['symbols'] as List<dynamic>).cast<Map<String, dynamic>>();
     final row = symbols.firstWhere(
       (item) => item['symbol'] == symbol,
       orElse: () => throw SymbolRulesException('Unknown symbol: $symbol'),
     );
-    final filters = (row['filters'] as List<dynamic>)
-        .cast<Map<String, dynamic>>();
+    final filters =
+        (row['filters'] as List<dynamic>).cast<Map<String, dynamic>>();
     Map<String, dynamic>? filter(String type) {
       for (final value in filters) {
         if (value['filterType'] == type) return value;
@@ -44,9 +44,8 @@ class SymbolTradingRules {
       minimumQuantity: _decimal(lot['minQty']),
       maximumQuantity: _decimal(lot['maxQty']),
       stepSize: _decimal(lot['stepSize']),
-      minimumNotional: notional == null
-          ? Decimal.zero
-          : _decimal(notional['minNotional']),
+      minimumNotional:
+          notional == null ? Decimal.zero : _decimal(notional['minNotional']),
     );
   }
 

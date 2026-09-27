@@ -85,6 +85,9 @@ class _DashboardPageState extends State<DashboardPage> {
       await widget.marketDataService.start();
       final reconciled = await _reconcile(snapshot);
       if (!reconciled || !mounted) return;
+      final values =
+          await StrategyConfigRepository(widget.repository.database).load();
+      if (values['runMode'] != 'PAPER') return;
       final runtime = PaperRuntimeCoordinator(
         database: widget.repository.database,
         marketData: widget.marketDataService,
@@ -200,6 +203,7 @@ class _DashboardPageState extends State<DashboardPage> {
         marketData: widget.marketDataService,
         credentials: credentials,
         accountId: strategyId,
+        accountBalances: widget.repository.accountBalanceSource,
         config: LiveRuntimeConfig(
           enabled: true,
           confirmation: LiveTradingConfirmation.phrase,
@@ -208,6 +212,12 @@ class _DashboardPageState extends State<DashboardPage> {
           targetBtcWeight: Decimal.parse(values['targetBTCWeight']!),
           triggerDeviation: Decimal.parse(values['triggerDeviation']!),
           repairRatio: Decimal.parse(values['repairRatio']!),
+          enableProfitWithdrawal: values['enableProfitWithdrawal'] == 'true',
+          profitWithdrawalRatio:
+              Decimal.parse(values['profitWithdrawalRatio']!),
+          safeTransferLimit: Decimal.parse(values['safeProfitTransferLimit']!),
+          maxBtcWeightAfterProfitTransfer:
+              Decimal.parse(values['maxBTCWeightAfterProfitTransfer']!),
         ),
       );
       final started = await live.start();
@@ -945,7 +955,8 @@ class _ErrorView extends StatelessWidget {
 
 String _number(Decimal value, int decimals) =>
     value.toDouble().toStringAsFixed(decimals);
-String _money(Decimal value) => '\$${value.toDouble().toStringAsFixed(2)}';
+String _money(Decimal value) =>
+    value == Decimal.zero ? '--' : '\$${value.toDouble().toStringAsFixed(2)}';
 String _percent(Decimal value) =>
     '${(value.toDouble() * 100).toStringAsFixed(2)}%';
 String _connection(ConnectionStatus status) => switch (status) {
