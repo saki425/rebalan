@@ -710,6 +710,37 @@ class _AccountCard extends StatelessWidget {
               label: const Text('划转 USDT 到账户1'),
             ),
           ],
+          if (account.role == AccountRole.funding && database != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => FundingPage(
+                    snapshot: DashboardSnapshot(
+                      btcPrice: price,
+                      change24h: Decimal.zero,
+                      websocketStatus: ConnectionStatus.unknown,
+                      apiStatus: ConnectionStatus.unknown,
+                      lastRestCalibration: null,
+                      accounts: allAccounts,
+                      strategyStatus: StrategyStatus.paused,
+                      config: StrategyConfig.defaults(),
+                      strategyProfit: Decimal.zero,
+                      profitWithdrawn: Decimal.zero,
+                      highWaterMark: Decimal.zero,
+                      maxDrawdown: Decimal.zero,
+                      cagr: Decimal.zero,
+                      totalFees: Decimal.zero,
+                      isDemo: false,
+                    ),
+                    database: database,
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.swap_horiz),
+              label: const Text('配置并划转到账户2'),
+            ),
+          ],
         ],
       ),
     );
