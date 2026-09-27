@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:decimal/decimal.dart';
@@ -129,6 +130,9 @@ class BinanceLiveClient {
       if (error.code != -1007) rethrow;
       return queryOrder(symbol: symbol, clientOrderId: clientOrderId);
     } on http.ClientException {
+      return queryOrder(symbol: symbol, clientOrderId: clientOrderId);
+    } on TimeoutException {
+      print('[BINANCE_HTTP] order request timeout; querying clientOrderId=$clientOrderId');
       return queryOrder(symbol: symbol, clientOrderId: clientOrderId);
     }
   }
@@ -268,10 +272,17 @@ class BinanceLiveClient {
     final uri = Uri.parse('$baseUri$path?$payload&signature=$signature');
     final headers = {'X-MBX-APIKEY': credentials.apiKey};
     final response = switch (method) {
-      'GET' => await _http.get(uri, headers: headers),
-      'POST' => await _http.post(uri, headers: headers),
+      'GET' => await _http
+          .get(uri, headers: headers)
+          .timeout(const Duration(seconds: 15)),
+      'POST' => await _http
+          .post(uri, headers: headers)
+          .timeout(const Duration(seconds: 15)),
       _ => throw ArgumentError.value(method, 'method'),
     };
+    print(
+      '[BINANCE_HTTP] $method $path status=${response.statusCode} body=${response.body}',
+    );
     _ensureSuccess(response);
     return response;
   }
