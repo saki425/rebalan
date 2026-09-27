@@ -57,6 +57,9 @@ class _FundingPageState extends State<FundingPage> {
 
   void _calculate() {
     try {
+      if (widget.snapshot.btcPrice <= Decimal.zero) {
+        throw StateError('BTC 价格尚未同步，请先刷新首页市场数据');
+      }
       final deposit = Decimal.parse(_depositController.text.trim());
       final plan = _manager.calculate(
         strategyAccount: _strategy,
@@ -381,7 +384,7 @@ class _FundingPageState extends State<FundingPage> {
                     runSpacing: 10,
                     children: [
                       OutlinedButton.icon(
-                        onPressed: () => setState(() {}),
+                        onPressed: _calculate,
                         icon: const Icon(Icons.refresh),
                         label: const Text('读取资产比例'),
                       ),
