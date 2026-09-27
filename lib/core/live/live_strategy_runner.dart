@@ -70,19 +70,38 @@ class LiveStrategyRunner {
       reason: decision.reason,
       orderId: response.orderId,
       status: response.status,
+      side: decision.side,
     );
   }
 }
 
 class LiveStrategyCheckResult {
-  const LiveStrategyCheckResult._({required this.status, required this.reason, this.orderId, this.orderStatus});
-  const LiveStrategyCheckResult.blocked(String reason) : this._(status: LiveCheckStatus.blocked, reason: reason);
-  const LiveStrategyCheckResult.noTrade(String reason) : this._(status: LiveCheckStatus.noTrade, reason: reason);
-  const LiveStrategyCheckResult.submitted({required String reason, required String orderId, required String status}) : this._(status: LiveCheckStatus.submitted, reason: reason, orderId: orderId, orderStatus: status);
+  const LiveStrategyCheckResult._(
+      {required this.status,
+      required this.reason,
+      this.orderId,
+      this.orderStatus,
+      this.side});
+  const LiveStrategyCheckResult.blocked(String reason)
+      : this._(status: LiveCheckStatus.blocked, reason: reason);
+  const LiveStrategyCheckResult.noTrade(String reason)
+      : this._(status: LiveCheckStatus.noTrade, reason: reason);
+  const LiveStrategyCheckResult.submitted(
+      {required String reason,
+      required String orderId,
+      required String status,
+      required RebalanceSide side})
+      : this._(
+            status: LiveCheckStatus.submitted,
+            reason: reason,
+            orderId: orderId,
+            orderStatus: status,
+            side: side);
   final LiveCheckStatus status;
   final String reason;
   final String? orderId;
   final String? orderStatus;
+  final RebalanceSide? side;
 }
 
 enum LiveCheckStatus { blocked, noTrade, submitted }

@@ -132,8 +132,8 @@ class _DashboardPageState extends State<DashboardPage> {
         report.state == RecoveryState.waitingOrder
             ? StrategyStatus.waitingOrder
             : report.tradingAllowed
-            ? StrategyStatus.paused
-            : StrategyStatus.apiError,
+                ? StrategyStatus.paused
+                : StrategyStatus.apiError,
       );
     });
     return report.tradingAllowed;
@@ -185,11 +185,16 @@ class _DashboardPageState extends State<DashboardPage> {
       // PAPER and LIVE runtimes must never evaluate the same account together.
       await _paperRuntime?.dispose();
       _paperRuntime = null;
-      final credentials = await const SecureCredentialStore().read(AccountRole.strategy);
-      if (credentials == null || !credentials.isValid) throw StateError('请先配置 Strategy Account API');
-      final rows = await widget.repository.database.query('accounts', columns: ['id', 'role']);
-      final strategyId = rows.firstWhere((row) => row['role'] == 'STRATEGY')['id'] as int;
-      final values = await StrategyConfigRepository(widget.repository.database).load();
+      final credentials =
+          await const SecureCredentialStore().read(AccountRole.strategy);
+      if (credentials == null || !credentials.isValid)
+        throw StateError('请先配置 Strategy Account API');
+      final rows = await widget.repository.database
+          .query('accounts', columns: ['id', 'role']);
+      final strategyId =
+          rows.firstWhere((row) => row['role'] == 'STRATEGY')['id'] as int;
+      final values =
+          await StrategyConfigRepository(widget.repository.database).load();
       final live = LiveRuntimeCoordinator(
         database: widget.repository.database,
         marketData: widget.marketDataService,
@@ -198,7 +203,8 @@ class _DashboardPageState extends State<DashboardPage> {
         config: LiveRuntimeConfig(
           enabled: true,
           confirmation: LiveTradingConfirmation.phrase,
-          checkInterval: Duration(seconds: int.parse(values['strategyCheckInterval']!)),
+          checkInterval:
+              Duration(seconds: int.parse(values['strategyCheckInterval']!)),
           targetBtcWeight: Decimal.parse(values['targetBTCWeight']!),
           triggerDeviation: Decimal.parse(values['triggerDeviation']!),
           repairRatio: Decimal.parse(values['repairRatio']!),
@@ -242,38 +248,43 @@ DashboardSnapshot _withMarket(DashboardSnapshot snapshot, MarketState market) =>
 DashboardSnapshot _withStrategyStatus(
   DashboardSnapshot snapshot,
   StrategyStatus status,
-) => DashboardSnapshot(
-  btcPrice: snapshot.btcPrice,
-  change24h: snapshot.change24h,
-  websocketStatus: snapshot.websocketStatus,
-  apiStatus: snapshot.apiStatus,
-  lastRestCalibration: snapshot.lastRestCalibration,
-  accounts: snapshot.accounts,
-  strategyStatus: status,
-  config: snapshot.config,
-  strategyProfit: snapshot.strategyProfit,
-  profitWithdrawn: snapshot.profitWithdrawn,
-  highWaterMark: snapshot.highWaterMark,
-  maxDrawdown: snapshot.maxDrawdown,
-  cagr: snapshot.cagr,
-  totalFees: snapshot.totalFees,
-  isDemo: snapshot.isDemo,
-);
+) =>
+    DashboardSnapshot(
+      btcPrice: snapshot.btcPrice,
+      change24h: snapshot.change24h,
+      websocketStatus: snapshot.websocketStatus,
+      apiStatus: snapshot.apiStatus,
+      lastRestCalibration: snapshot.lastRestCalibration,
+      accounts: snapshot.accounts,
+      strategyStatus: status,
+      config: snapshot.config,
+      strategyProfit: snapshot.strategyProfit,
+      profitWithdrawn: snapshot.profitWithdrawn,
+      highWaterMark: snapshot.highWaterMark,
+      maxDrawdown: snapshot.maxDrawdown,
+      cagr: snapshot.cagr,
+      totalFees: snapshot.totalFees,
+      isDemo: snapshot.isDemo,
+    );
 
 StrategyStatus _strategyStatus(StrategyRuntimeState state) => switch (state) {
-  StrategyRuntimeState.idle ||
-  StrategyRuntimeState.cooldown ||
-  StrategyRuntimeState.filled => StrategyStatus.running,
-  StrategyRuntimeState.triggered ||
-  StrategyRuntimeState.calculating ||
-  StrategyRuntimeState.rebalancing => StrategyStatus.rebalancing,
-  StrategyRuntimeState.orderSubmitted ||
-  StrategyRuntimeState.partiallyFilled => StrategyStatus.waitingOrder,
-  StrategyRuntimeState.apiError ||
-  StrategyRuntimeState.error => StrategyStatus.apiError,
-  StrategyRuntimeState.websocketDisconnected =>
-    StrategyStatus.websocketDisconnected,
-};
+      StrategyRuntimeState.idle ||
+      StrategyRuntimeState.cooldown ||
+      StrategyRuntimeState.filled =>
+        StrategyStatus.running,
+      StrategyRuntimeState.triggered ||
+      StrategyRuntimeState.calculating ||
+      StrategyRuntimeState.rebalancing =>
+        StrategyStatus.rebalancing,
+      StrategyRuntimeState.orderSubmitted ||
+      StrategyRuntimeState.partiallyFilled =>
+        StrategyStatus.waitingOrder,
+      StrategyRuntimeState.apiError ||
+      StrategyRuntimeState.error =>
+        StrategyStatus.apiError,
+      StrategyRuntimeState.websocketDisconnected =>
+        StrategyStatus.websocketDisconnected,
+    };
 
 class DashboardView extends StatelessWidget {
   const DashboardView({
@@ -300,9 +311,8 @@ class DashboardView extends StatelessWidget {
     // PortfolioManager requires a positive valuation price, so use a neutral
     // unit price only for zero-balance rendering until REST/WebSocket data is
     // available. The displayed market price remains 0.00.
-    final valuationPrice = snapshot.btcPrice > Decimal.zero
-        ? snapshot.btcPrice
-        : Decimal.one;
+    final valuationPrice =
+        snapshot.btcPrice > Decimal.zero ? snapshot.btcPrice : Decimal.one;
     final total = portfolios.valueAccounts(
       snapshot.accounts,
       valuationPrice,
@@ -422,8 +432,7 @@ class DashboardView extends StatelessWidget {
                   ),
                   _Metric(
                     label: 'REST 校准',
-                    value:
-                        snapshot.lastRestCalibration?.toLocal().toString() ??
+                    value: snapshot.lastRestCalibration?.toLocal().toString() ??
                         '尚未校准',
                   ),
                 ],
@@ -546,15 +555,19 @@ class _LiveConfirmationDialog extends StatelessWidget {
   const _LiveConfirmationDialog();
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('启动真实 LIVE 策略？'),
-    content: const Text(
-      '这将允许账户2调用 Binance 真实下单接口。请确认已配置 IP 白名单、关闭提现权限，并准备使用真实资金。\n\n确认短语：ENABLE LIVE TRADING',
-    ),
-    actions: [
-      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-      FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('确认启动 LIVE')),
-    ],
-  );
+        title: const Text('启动真实 LIVE 策略？'),
+        content: const Text(
+          '这将允许账户2调用 Binance 真实下单接口。请确认已配置 IP 白名单、关闭提现权限，并准备使用真实资金。\n\n确认短语：ENABLE LIVE TRADING',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('确认启动 LIVE')),
+        ],
+      );
 }
 
 class _Section extends StatelessWidget {
@@ -564,28 +577,28 @@ class _Section extends StatelessWidget {
   final Widget? trailing;
   @override
   Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  if (trailing != null) trailing!,
+                ],
               ),
-              ?trailing,
+              const SizedBox(height: 16),
+              child,
             ],
           ),
-          const SizedBox(height: 16),
-          child,
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 }
 
 class _Metric extends StatelessWidget {
@@ -599,34 +612,39 @@ class _Metric extends StatelessWidget {
   final bool accent;
   @override
   Widget build(BuildContext context) => Container(
-    width: 190,
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: const Color(0xFF20252D),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: Color(0xFF9AA4B2))),
-        const SizedBox(height: 7),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-            color: accent ? const Color(0xFFF4B740) : null,
-          ),
+        width: 190,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF20252D),
+          borderRadius: BorderRadius.circular(12),
         ),
-      ],
-    ),
-  );
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(color: Color(0xFF9AA4B2))),
+            const SizedBox(height: 7),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: accent ? const Color(0xFFF4B740) : null,
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 class _AccountCard extends StatelessWidget {
-  const _AccountCard({required this.account, required this.price, this.database, required this.allAccounts, this.onRefresh});
+  const _AccountCard(
+      {required this.account,
+      required this.price,
+      this.database,
+      required this.allAccounts,
+      this.onRefresh});
   final AccountBalance account;
   final Decimal price;
   final Database? database;
@@ -687,31 +705,47 @@ class _AccountCard extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('确认真实划转'),
-        content: Text('将从 Strategy Account 划转 $amount USDT 到 Profit Account。\n\n这会调用 Binance 真实 API，是否继续？'),
+        content: Text(
+            '将从 Strategy Account 划转 $amount USDT 到 Profit Account。\n\n这会调用 Binance 真实 API，是否继续？'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('确认真实划转')),
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('确认真实划转')),
         ],
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    final progress = ScaffoldMessenger.of(context)..showSnackBar(const SnackBar(content: Text('正在提交真实划转…')));
+    final progress = ScaffoldMessenger.of(context)
+      ..showSnackBar(const SnackBar(content: Text('正在提交真实划转…')));
     try {
       final store = const SecureCredentialStore();
       final credentials = await store.read(AccountRole.strategy);
       final profitCredentials = await store.read(AccountRole.profit);
-      if (credentials == null || profitCredentials == null || !credentials.isValid || !profitCredentials.isValid || profitCredentials.accountEmail.isEmpty) {
+      if (credentials == null ||
+          profitCredentials == null ||
+          !credentials.isValid ||
+          !profitCredentials.isValid ||
+          profitCredentials.accountEmail.isEmpty) {
         throw StateError('请先配置 Strategy 和 Profit 两个子账户 API，并填写 Profit 子账户邮箱');
       }
       final client = BinanceLiveClient(credentials: credentials);
       try {
         await client.synchronizeTime();
-        final permissions = ApiPermissionSnapshot.fromBinance(await client.apiRestrictions());
-        if (!permissions.internalTransferEnabled || permissions.withdrawalsEnabled) throw StateError('API 必须开启内部划转、关闭提现权限');
+        final permissions =
+            ApiPermissionSnapshot.fromBinance(await client.apiRestrictions());
+        if (!permissions.internalTransferEnabled ||
+            permissions.withdrawalsEnabled)
+          throw StateError('API 必须开启内部划转、关闭提现权限');
         final rows = await database!.query('accounts', columns: ['id', 'role']);
-        int id(String role) => rows.firstWhere((row) => row['role'] == role)['id'] as int;
-        final execution = LiveExecutionService(database: database!, client: client);
-        final key = 'manual-profit-${DateTime.now().toUtc().microsecondsSinceEpoch}';
+        int id(String role) =>
+            rows.firstWhere((row) => row['role'] == role)['id'] as int;
+        final execution =
+            LiveExecutionService(database: database!, client: client);
+        final key =
+            'manual-profit-${DateTime.now().toUtc().microsecondsSinceEpoch}';
         final transferId = await execution.siblingTransfer(
           fromAccountId: id('STRATEGY'),
           toAccountId: id('PROFIT'),
@@ -724,14 +758,18 @@ class _AccountCard extends StatelessWidget {
           note: 'Manual profit transfer test; bypassed profit-condition check',
         );
         progress.hideCurrentSnackBar();
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('真实划转成功，Transfer ID: $transferId')));
+        if (context.mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('真实划转成功，Transfer ID: $transferId')));
         await onRefresh?.call();
       } finally {
         client.close();
       }
     } catch (error) {
       progress.hideCurrentSnackBar();
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('真实划转失败：$error')));
+      if (context.mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('真实划转失败：$error')));
     }
   }
 
@@ -745,31 +783,47 @@ class _AccountCard extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('确认真实划转'),
-        content: Text('将从 Profit Account 划转 $amount USDT 到 Funding Account。\n\n这会调用 Binance 真实 API，是否继续？'),
+        content: Text(
+            '将从 Profit Account 划转 $amount USDT 到 Funding Account。\n\n这会调用 Binance 真实 API，是否继续？'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('确认真实划转')),
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('确认真实划转')),
         ],
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    final messenger = ScaffoldMessenger.of(context)..showSnackBar(const SnackBar(content: Text('正在提交真实划转…')));
+    final messenger = ScaffoldMessenger.of(context)
+      ..showSnackBar(const SnackBar(content: Text('正在提交真实划转…')));
     try {
       final store = const SecureCredentialStore();
       final source = await store.read(AccountRole.profit);
       final destination = await store.read(AccountRole.funding);
-      if (source == null || destination == null || !source.isValid || !destination.isValid || destination.accountEmail.isEmpty) {
+      if (source == null ||
+          destination == null ||
+          !source.isValid ||
+          !destination.isValid ||
+          destination.accountEmail.isEmpty) {
         throw StateError('请先配置 Profit 和 Funding 两个子账户 API，并填写 Funding 子账户邮箱');
       }
       final client = BinanceLiveClient(credentials: source);
       try {
         await client.synchronizeTime();
-        final permissions = ApiPermissionSnapshot.fromBinance(await client.apiRestrictions());
-        if (!permissions.internalTransferEnabled || permissions.withdrawalsEnabled) throw StateError('API 必须开启内部划转、关闭提现权限');
+        final permissions =
+            ApiPermissionSnapshot.fromBinance(await client.apiRestrictions());
+        if (!permissions.internalTransferEnabled ||
+            permissions.withdrawalsEnabled)
+          throw StateError('API 必须开启内部划转、关闭提现权限');
         final rows = await database!.query('accounts', columns: ['id', 'role']);
-        int id(String role) => rows.firstWhere((row) => row['role'] == role)['id'] as int;
-        final execution = LiveExecutionService(database: database!, client: client);
-        final key = 'manual-profit-to-funding-${DateTime.now().toUtc().microsecondsSinceEpoch}';
+        int id(String role) =>
+            rows.firstWhere((row) => row['role'] == role)['id'] as int;
+        final execution =
+            LiveExecutionService(database: database!, client: client);
+        final key =
+            'manual-profit-to-funding-${DateTime.now().toUtc().microsecondsSinceEpoch}';
         final transferId = await execution.siblingTransfer(
           fromAccountId: id('PROFIT'),
           toAccountId: id('FUNDING'),
@@ -782,14 +836,18 @@ class _AccountCard extends StatelessWidget {
           note: 'Manual Profit Account to Funding Account transfer',
         );
         messenger.hideCurrentSnackBar();
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('真实划转成功，Transfer ID: $transferId')));
+        if (context.mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('真实划转成功，Transfer ID: $transferId')));
         await onRefresh?.call();
       } finally {
         client.close();
       }
     } catch (error) {
       messenger.hideCurrentSnackBar();
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('真实划转失败：$error')));
+      if (context.mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('真实划转失败：$error')));
     }
   }
 }
@@ -808,63 +866,70 @@ class _ProfitAmountDialogState extends State<_ProfitAmountDialog> {
     super.initState();
     _controller = TextEditingController();
   }
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('真实划转到 Profit Account'),
-    content: TextField(
-      controller: _controller,
-      autofocus: true,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: InputDecoration(labelText: 'USDT 数量（最多 ${widget.maximum}）'),
-    ),
-    actions: [
-      TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-      FilledButton(
-        onPressed: () {
-          final value = Decimal.tryParse(_controller.text.trim());
-          if (value != null && value > Decimal.zero && value <= widget.maximum) Navigator.pop(context, value);
-        },
-        child: const Text('下一步'),
-      ),
-    ],
-  );
+        title: const Text('真实划转到 Profit Account'),
+        content: TextField(
+          controller: _controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration:
+              InputDecoration(labelText: 'USDT 数量（最多 ${widget.maximum}）'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          FilledButton(
+            onPressed: () {
+              final value = Decimal.tryParse(_controller.text.trim());
+              if (value != null &&
+                  value > Decimal.zero &&
+                  value <= widget.maximum) Navigator.pop(context, value);
+            },
+            child: const Text('下一步'),
+          ),
+        ],
+      );
 }
 
 Widget _line(String label, String value) => Padding(
-  padding: const EdgeInsets.symmetric(vertical: 4),
-  child: Row(
-    children: [
-      Expanded(
-        child: Text(label, style: const TextStyle(color: Color(0xFF9AA4B2))),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child:
+                Text(label, style: const TextStyle(color: Color(0xFF9AA4B2))),
+          ),
+          Text(value),
+        ],
       ),
-      Text(value),
-    ],
-  ),
-);
+    );
 
 class _Notice extends StatelessWidget {
   const _Notice({required this.text});
   final String text;
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: const Color(0xFF3B311B),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Row(
-      children: [
-        const Icon(Icons.info_outline, color: Color(0xFFF4B740)),
-        const SizedBox(width: 10),
-        Expanded(child: Text(text)),
-      ],
-    ),
-  );
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF3B311B),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline, color: Color(0xFFF4B740)),
+            const SizedBox(width: 10),
+            Expanded(child: Text(text)),
+          ],
+        ),
+      );
 }
 
 class _ErrorView extends StatelessWidget {
@@ -872,10 +937,10 @@ class _ErrorView extends StatelessWidget {
   final String message;
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: Center(
-      child: Text('数据库初始化失败\n$message', textAlign: TextAlign.center),
-    ),
-  );
+        body: Center(
+          child: Text('数据库初始化失败\n$message', textAlign: TextAlign.center),
+        ),
+      );
 }
 
 String _number(Decimal value, int decimals) =>
@@ -884,7 +949,7 @@ String _money(Decimal value) => '\$${value.toDouble().toStringAsFixed(2)}';
 String _percent(Decimal value) =>
     '${(value.toDouble() * 100).toStringAsFixed(2)}%';
 String _connection(ConnectionStatus status) => switch (status) {
-  ConnectionStatus.connected => 'CONNECTED',
-  ConnectionStatus.disconnected => 'DISCONNECTED',
-  ConnectionStatus.unknown => 'NOT CONNECTED',
-};
+      ConnectionStatus.connected => 'CONNECTED',
+      ConnectionStatus.disconnected => 'DISCONNECTED',
+      ConnectionStatus.unknown => 'NOT CONNECTED',
+    };

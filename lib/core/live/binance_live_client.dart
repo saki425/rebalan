@@ -20,12 +20,12 @@ class LiveOrderResponse {
   final Decimal executedQuantity;
   final Decimal cumulativeQuoteQuantity;
   bool get isTerminal => const {
-    'FILLED',
-    'CANCELED',
-    'REJECTED',
-    'EXPIRED',
-    'EXPIRED_IN_MATCH',
-  }.contains(status);
+        'FILLED',
+        'CANCELED',
+        'REJECTED',
+        'EXPIRED',
+        'EXPIRED_IN_MATCH',
+      }.contains(status);
 
   factory LiveOrderResponse.fromJson(Map<String, dynamic> json) =>
       LiveOrderResponse(
@@ -52,8 +52,8 @@ class BinanceLiveClient {
     this.recvWindow = 5000,
     DateTime Function()? clock,
     this.signer = const BinanceSigner(),
-  }) : _http = httpClient ?? http.Client(),
-       _clock = clock ?? DateTime.now;
+  })  : _http = httpClient ?? http.Client(),
+        _clock = clock ?? DateTime.now;
 
   final BinanceCredentials credentials;
   final http.Client _http;
@@ -66,9 +66,8 @@ class BinanceLiveClient {
   Future<void> synchronizeTime() async {
     final response = await _http.get(Uri.parse('$baseUri/api/v3/time'));
     _ensureSuccess(response);
-    final serverTime =
-        (jsonDecode(response.body) as Map<String, dynamic>)['serverTime']
-            as int;
+    final serverTime = (jsonDecode(response.body)
+        as Map<String, dynamic>)['serverTime'] as int;
     _serverOffsetMs = serverTime - _clock().toUtc().millisecondsSinceEpoch;
   }
 
@@ -136,6 +135,35 @@ class BinanceLiveClient {
     }
   }
 
+  Future<LiveOrderResponse> queryOrderById({
+    required String symbol,
+    required String orderId,
+  }) async {
+    try {
+      final json = await _signed('GET', '/api/v3/order', {
+        'symbol': symbol,
+        'orderId': orderId,
+      });
+      return LiveOrderResponse.fromJson(json);
+    } catch (error) {
+      throw OrderStatusUnknownException(orderId, error);
+    }
+  }
+
+  /// Returns the fills for an order. Reconciliation uses this endpoint after
+  /// reconnect so local trade/fee records can be repaired from Binance.
+  Future<List<Map<String, dynamic>>> myTrades({
+    String symbol = 'BTCUSDT',
+    required String orderId,
+  }) async {
+    final rows = await _signedList('GET', '/api/v3/myTrades', {
+      'symbol': symbol,
+      'orderId': orderId,
+      'limit': '1000',
+    });
+    return rows.cast<Map<String, dynamic>>();
+  }
+
   Future<String> universalTransfer({
     String? fromEmail,
     String? toEmail,
@@ -146,8 +174,8 @@ class BinanceLiveClient {
     required String clientTransferId,
   }) async {
     final parameters = <String, String>{
-      'fromEmail': ?fromEmail,
-      'toEmail': ?toEmail,
+      if (fromEmail != null) 'fromEmail': fromEmail,
+      if (toEmail != null) 'toEmail': toEmail,
       'fromAccountType': fromAccountType,
       'toAccountType': toAccountType,
       'asset': asset,

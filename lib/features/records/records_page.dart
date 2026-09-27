@@ -37,22 +37,22 @@ class _RecordsPageState extends State<RecordsPage>
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('交易与资金记录'),
-      bottom: TabBar(
-        controller: _tabs,
-        isScrollable: true,
-        tabs: [for (final item in _tables) Tab(text: item.$2)],
-      ),
-    ),
-    body: TabBarView(
-      controller: _tabs,
-      children: [
-        for (final item in _tables)
-          _RecordList(database: widget.database, table: item.$1),
-      ],
-    ),
-  );
+        appBar: AppBar(
+          title: const Text('交易与资金记录'),
+          bottom: TabBar(
+            controller: _tabs,
+            isScrollable: true,
+            tabs: [for (final item in _tables) Tab(text: item.$2)],
+          ),
+        ),
+        body: TabBarView(
+          controller: _tabs,
+          children: [
+            for (final item in _tables)
+              _RecordList(database: widget.database, table: item.$1),
+          ],
+        ),
+      );
 }
 
 class _RecordList extends StatelessWidget {
@@ -76,7 +76,7 @@ class _RecordList extends StatelessWidget {
           return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: rows.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            separatorBuilder: (_, index) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final row = rows[index];
               final title = _title(row);

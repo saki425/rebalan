@@ -22,8 +22,8 @@ class LiveExecutionService {
   }) async {
     final existing = await database.query(
       'orders',
-      where: 'idempotency_key = ?',
-      whereArgs: [idempotencyKey],
+      where: 'idempotency_key = ? OR client_order_id = ?',
+      whereArgs: [idempotencyKey, clientOrderId],
       limit: 1,
     );
     if (existing.isNotEmpty) {
