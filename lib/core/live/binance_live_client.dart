@@ -80,6 +80,19 @@ class BinanceLiveClient {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  Future<Decimal> currentPrice({String symbol = 'BTCUSDT'}) async {
+    final uri = Uri.parse('$baseUri/api/v3/ticker/price')
+        .replace(queryParameters: {'symbol': symbol});
+    final response = await _http.get(uri);
+    _ensureSuccess(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final value = Decimal.parse(json['price']?.toString() ?? '0');
+    if (value <= Decimal.zero) {
+      throw StateError('Binance returned an invalid $symbol price');
+    }
+    return value;
+  }
+
   Future<Map<String, dynamic>> account() =>
       _signed('GET', '/api/v3/account', const {});
 

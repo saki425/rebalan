@@ -167,17 +167,6 @@ class _FundingPageState extends State<FundingPage> {
   Future<void> _executeLiveBuy() async {
     final database = widget.database;
     if (database == null || _executing) return;
-    _calculate();
-    if (_plan == null || _plan!.buyBtcQuantity <= Decimal.zero) {
-      if (mounted) setState(() => _liveMessage = '当前配置无需购买 BTC');
-      return;
-    }
-    if (!await _confirmLive(
-      'LIVE 真实买入 BTC',
-      '将使用账户1真实资金买入约 ${_plan!.buyBtcQuantity} BTC，确认继续？',
-    )) {
-      return;
-    }
     setState(() {
       _executing = true;
       _error = null;
@@ -188,6 +177,30 @@ class _FundingPageState extends State<FundingPage> {
       final (fundingId, _, credentials, _) = await _liveContext(database);
       client = BinanceLiveClient(credentials: credentials);
       await client.synchronizeTime();
+      // A disconnected market stream can leave the page snapshot at zero.
+      // Fetch a fresh REST price before calculating quantity, otherwise the
+      // exchange rule check sees a zero notional and rejects the order.
+      final price = widget.snapshot.btcPrice > Decimal.zero
+          ? widget.snapshot.btcPrice
+          : await client.currentPrice();
+      final deposit = Decimal.parse(_depositController.text.trim());
+      final plan = _manager.calculate(
+        strategyAccount: _strategy,
+        depositUsdt: deposit,
+        btcPrice: price,
+        targetBtcWeight: widget.snapshot.config.targetBtcWeight,
+      );
+      if (mounted) setState(() => _plan = plan);
+      if (plan.buyBtcQuantity <= Decimal.zero) {
+        if (mounted) setState(() => _liveMessage = '当前配置无需购买 BTC');
+        return;
+      }
+      if (!await _confirmLive(
+        'LIVE 真实买入 BTC',
+        '将使用账户1真实资金买入约 ${plan.buyBtcQuantity} BTC，确认继续？',
+      )) {
+        return;
+      }
       final restrictions = await client.apiRestrictions();
       if (restrictions['enableSpotAndMarginTrading'] != true ||
           restrictions['enableWithdrawals'] == true) {
@@ -200,8 +213,8 @@ class _FundingPageState extends State<FundingPage> {
           ).marketOrder(
             accountId: fundingId,
             side: 'BUY',
-            requestedQuantity: _plan!.buyBtcQuantity,
-            referencePrice: widget.snapshot.btcPrice,
+            requestedQuantity: plan.buyBtcQuantity,
+            referencePrice: price,
             clientOrderId:
                 'funding-buy-${DateTime.now().toUtc().microsecondsSinceEpoch}',
             idempotencyKey:
