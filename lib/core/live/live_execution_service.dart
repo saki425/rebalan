@@ -32,14 +32,40 @@ class LiveExecutionService {
       print('[LIVE_ORDER] DUPLICATE blocked clientOrderId=$clientOrderId');
       throw DuplicateLiveExecutionException(idempotencyKey);
     }
-    final rules = SymbolTradingRules.fromExchangeInfo(
-      await client.exchangeInfo(symbol: symbol),
-      symbol,
-    );
-    final quantity = rules.validateAndNormalize(
-      requestedQuantity: requestedQuantity,
-      referencePrice: referencePrice,
-    );
+    print('[LIVE_ORDER] loading exchange rules symbol=$symbol');
+    try {
+      final info = await client.exchangeInfo(symbol: symbol);
+      print('[LIVE_ORDER] parsing exchange rules symbol=$symbol');
+      final rules = SymbolTradingRules.fromExchangeInfo(info, symbol);
+      final quantity = rules.validateAndNormalize(
+        requestedQuantity: requestedQuantity,
+        referencePrice: referencePrice,
+      );
+      print('[LIVE_ORDER] normalized quantity=$quantity symbol=$symbol');
+      return await _submitMarketOrder(
+        accountId: accountId,
+        side: side,
+        quantity: quantity,
+        symbol: symbol,
+        clientOrderId: clientOrderId,
+        idempotencyKey: idempotencyKey,
+        reason: reason,
+      );
+    } catch (error) {
+      print('[LIVE_ORDER] pre-submit failed symbol=$symbol error=$error');
+      rethrow;
+    }
+  }
+
+  Future<LiveOrderResponse> _submitMarketOrder({
+    required int accountId,
+    required String side,
+    required Decimal quantity,
+    required String symbol,
+    required String clientOrderId,
+    required String idempotencyKey,
+    required String reason,
+  }) async {
     final now = DateTime.now().toUtc().toIso8601String();
     await database.insert('orders', {
       'client_order_id': clientOrderId,

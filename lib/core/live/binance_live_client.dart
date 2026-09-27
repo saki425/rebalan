@@ -73,10 +73,16 @@ class BinanceLiveClient {
   }
 
   Future<Map<String, dynamic>> exchangeInfo({String symbol = 'BTCUSDT'}) async {
+    print('[BINANCE_HTTP] GET /api/v3/exchangeInfo symbol=$symbol');
     final uri = Uri.parse(
       '$baseUri/api/v3/exchangeInfo',
     ).replace(queryParameters: {'symbol': symbol});
-    final response = await _http.get(uri);
+    final response = await _http
+        .get(uri)
+        .timeout(const Duration(seconds: 15));
+    print(
+      '[BINANCE_HTTP] GET /api/v3/exchangeInfo status=${response.statusCode} body=${response.body}',
+    );
     _ensureSuccess(response);
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
