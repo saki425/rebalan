@@ -303,6 +303,81 @@ class _FundingPageState extends State<FundingPage> {
     }
   }
 
+  Future<void> _executeLiveTransferBalances() async {
+    final database = widget.database;
+    if (database == null || _executing) return;
+    final btc = _funding.btc;
+    final usdt = _funding.usdt;
+    if (btc <= Decimal.zero && usdt <= Decimal.zero) {
+      setState(() => _error = '账户1没有可划转的 BTC 或 USDT');
+      return;
+    }
+    if (!await _confirmLive(
+      'LIVE 划转账户1余额',
+      '将把账户1当前余额划转到账户2：\nBTC: $btc\nUSDT: $usdt\n\n确认继续？',
+    )) {
+      return;
+    }
+    setState(() {
+      _executing = true;
+      _error = null;
+    });
+    BinanceLiveClient? client;
+    try {
+      final (fundingId, strategyId, credentials, strategyEmail) =
+          await _liveContext(database);
+      client = BinanceLiveClient(credentials: credentials);
+      await client.synchronizeTime();
+      final restrictions = await client.apiRestrictions();
+      if (restrictions['enableWithdrawals'] == true ||
+          (restrictions['enableInternalTransfer'] != true &&
+              restrictions['permitsUniversalTransfer'] != true)) {
+        throw StateError('Funding API 未开启内部划转或提现权限未关闭');
+      }
+      final execution = LiveExecutionService(
+        database: database,
+        client: client,
+      );
+      final base =
+          'funding-balance-${DateTime.now().toUtc().microsecondsSinceEpoch}';
+      final transfers = <String>[];
+      if (btc > Decimal.zero) {
+        transfers.add(await execution.siblingTransfer(
+          fromAccountId: fundingId,
+          toAccountId: strategyId,
+          toEmail: strategyEmail,
+          asset: 'BTC',
+          amount: btc,
+          clientTransferId: '$base-btc',
+          idempotencyKey: '$base-btc',
+          transferType: 'FUNDING_BALANCE_TO_STRATEGY',
+          note: 'Manual LIVE Funding BTC balance transfer',
+        ));
+      }
+      if (usdt > Decimal.zero) {
+        transfers.add(await execution.siblingTransfer(
+          fromAccountId: fundingId,
+          toAccountId: strategyId,
+          toEmail: strategyEmail,
+          asset: 'USDT',
+          amount: usdt,
+          clientTransferId: '$base-usdt',
+          idempotencyKey: '$base-usdt',
+          transferType: 'FUNDING_BALANCE_TO_STRATEGY',
+          note: 'Manual LIVE Funding USDT balance transfer',
+        ));
+      }
+      if (mounted) {
+        setState(() => _liveMessage = 'LIVE 余额划转成功：${transfers.join(', ')}');
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = 'LIVE 余额划转失败：$error');
+    } finally {
+      client?.close();
+      if (mounted) setState(() => _executing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final current = const PortfolioManager().valueAccount(
@@ -405,6 +480,12 @@ class _FundingPageState extends State<FundingPage> {
                             ? _executeLiveTransfer
                             : null,
                         child: const Text('LIVE 划转至账户2'),
+                      ),
+                      OutlinedButton(
+                        onPressed: _liveMode && !_executing
+                            ? _executeLiveTransferBalances
+                            : null,
+                        child: const Text('LIVE 划转当前 BTC + USDT'),
                       ),
                       FilledButton(
                         onPressed:
