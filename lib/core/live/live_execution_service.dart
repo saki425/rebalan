@@ -20,6 +20,8 @@ class LiveExecutionService {
     required String reason,
     String symbol = 'BTCUSDT',
   }) async {
+    print(
+        '[LIVE_ORDER] submit side=$side qty=$requestedQuantity clientOrderId=$clientOrderId');
     final existing = await database.query(
       'orders',
       where: 'idempotency_key = ? OR client_order_id = ?',
@@ -27,6 +29,7 @@ class LiveExecutionService {
       limit: 1,
     );
     if (existing.isNotEmpty) {
+      print('[LIVE_ORDER] DUPLICATE blocked clientOrderId=$clientOrderId');
       throw DuplicateLiveExecutionException(idempotencyKey);
     }
     final rules = SymbolTradingRules.fromExchangeInfo(
@@ -61,6 +64,8 @@ class LiveExecutionService {
         clientOrderId: clientOrderId,
       );
       await _updateOrder(response, clientOrderId);
+      print(
+          '[LIVE_ORDER] response orderId=${response.orderId} status=${response.status} executed=${response.executedQuantity}');
       return response;
     } on OrderStatusUnknownException {
       await database.update(
@@ -72,8 +77,10 @@ class LiveExecutionService {
         where: 'client_order_id = ?',
         whereArgs: [clientOrderId],
       );
+      print(
+          '[LIVE_ORDER] status UNKNOWN clientOrderId=$clientOrderId; reconciliation required');
       rethrow;
-    } catch (_) {
+    } catch (error) {
       await database.update(
         'orders',
         {
@@ -83,6 +90,8 @@ class LiveExecutionService {
         where: 'client_order_id = ?',
         whereArgs: [clientOrderId],
       );
+      print(
+          '[LIVE_ORDER] status ERROR clientOrderId=$clientOrderId error=$error');
       rethrow;
     }
   }

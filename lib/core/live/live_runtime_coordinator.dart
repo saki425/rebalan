@@ -45,6 +45,7 @@ class LiveRuntimeCoordinator {
   bool get isRunning => _timer?.isActive == true;
 
   Future<bool> start() async {
+    _log('start requested enabled=${config.enabled} accountId=$accountId');
     if (isRunning) return true;
     if (!config.enabled ||
         config.confirmation != LiveTradingConfirmation.phrase ||
@@ -77,18 +78,21 @@ class LiveRuntimeCoordinator {
       if (!reconciliation.ok) {
         _paused = true;
         _emit('LIVE_PAUSED', reconciliation.reason);
+        _log('startup reconciliation FAILED: ${reconciliation.reason}');
         client.close();
         _client = null;
         _runner = null;
         return false;
       }
       await _initializeHighWaterMark(client);
+      _log('startup reconciliation OK; LIVE HWM ready');
       _timer = Timer.periodic(config.checkInterval, (_) => unawaited(_check()));
       await _check();
       return true;
     } catch (error) {
       client.close();
       _emit('LIVE_ERROR', '$error');
+      _log('start ERROR: $error');
       return false;
     }
   }
@@ -104,6 +108,8 @@ class LiveRuntimeCoordinator {
         _paused = true;
         _wasWebsocketConnected = false;
         _emit('LIVE_PAUSED', 'WEBSOCKET_DISCONNECTED_OR_PRICE_STALE');
+        _log(
+            'paused websocket=${market.websocketStatus} price=${market.price}');
         return;
       }
       if (_paused || !_wasWebsocketConnected) {
@@ -114,13 +120,17 @@ class LiveRuntimeCoordinator {
         if (!reconciliation.ok) {
           _paused = true;
           _emit('LIVE_PAUSED', reconciliation.reason);
+          _log('reconnect reconciliation FAILED: ${reconciliation.reason}');
           return;
         }
         _paused = false;
         _emit('LIVE_RECONCILED', reconciliation.reason);
+        _log('reconnect reconciliation OK: ${reconciliation.reason}');
       }
       _wasWebsocketConnected = true;
       final account = await _readStrategyAccount(_client!);
+      _log(
+          'check price=${market.price} BTC=${account.btc} USDT=${account.usdt}');
       await _observeHighWaterMark(account, market.price);
       final result = await _runner!.check(
         strategyAccount: account,
@@ -132,12 +142,15 @@ class LiveRuntimeCoordinator {
         idempotencyKey: 'live-${DateTime.now().toUtc().microsecondsSinceEpoch}',
       );
       _emit(result.status.name.toUpperCase(), result.reason);
+      _log(
+          'result=${result.status.name} reason=${result.reason} order=${result.orderId ?? '-'} status=${result.orderStatus ?? '-'}');
       if (result.status == LiveCheckStatus.submitted &&
           result.orderStatus == 'FILLED') {
         await _maybeWithdrawProfit(account, market.price, result);
       }
     } catch (error) {
       _emit('LIVE_ERROR', '$error');
+      _log('check ERROR: $error');
     } finally {
       _checking = false;
     }
@@ -153,6 +166,7 @@ class LiveRuntimeCoordinator {
         result.side != RebalanceSide.sell) {
       return;
     }
+    _log('profit evaluation after SELL order=${result.orderId}');
     final profitCredentials =
         await const SecureCredentialStore().read(AccountRole.profit);
     if (profitCredentials == null || !profitCredentials.isValid) {
@@ -189,6 +203,8 @@ class LiveRuntimeCoordinator {
     );
     if (!decision.shouldTransfer) {
       _emit('PROFIT_WITHDRAWAL_SKIPPED', decision.reason.name.toUpperCase());
+      _log(
+          'profit skipped reason=${decision.reason.name} newProfit=${decision.newProfit} transfer=${decision.transferAmount}');
       return;
     }
     final profitAccountId = row.single['id'] as int;
@@ -220,6 +236,7 @@ class LiveRuntimeCoordinator {
       ),
     );
     _emit('PROFIT_WITHDRAWAL_FILLED', decision.transferAmount.toString());
+    _log('profit transfer submitted amount=${decision.transferAmount}');
   }
 
   Future<void> _initializeHighWaterMark(BinanceLiveClient client) async {
@@ -235,9 +252,9 @@ class LiveRuntimeCoordinator {
         .totalEquity;
     final repository = HighWaterMarkRepository(database);
     final latest = await repository.loadLatest();
-    final liveLatest = latest != null && latest.reason.startsWith('LIVE_')
-        ? latest
-        : null;
+    final liveLatest =
+        latest != null && latest.reason.startsWith('LIVE_') ? latest : null;
+    _log('HWM equity=$equity previous=${liveLatest?.value ?? '-'}');
     _highWaterMark = HighWaterMarkManager(
       initialHighWaterMark: liveLatest?.value ?? equity,
     );
@@ -249,6 +266,7 @@ class LiveRuntimeCoordinator {
           effectiveAt: DateTime.now().toUtc(),
         ),
       );
+      _log('HWM initialized value=$equity');
     }
   }
 
@@ -276,6 +294,7 @@ class LiveRuntimeCoordinator {
           effectiveAt: now,
         ),
       );
+      _log('HWM advanced $before -> ${manager.value}');
     }
   }
 
@@ -318,6 +337,8 @@ class LiveRuntimeCoordinator {
       _events.add(LiveRuntimeEvent(state: state, reason: reason));
     }
   }
+
+  void _log(String message) => print('[LIVE] $message');
 }
 
 class LiveRuntimeConfig {

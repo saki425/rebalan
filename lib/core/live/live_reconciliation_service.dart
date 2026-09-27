@@ -25,11 +25,14 @@ class LiveReconciliationService {
   final BinanceLiveClient client;
 
   Future<LiveReconciliationResult> reconcile() async {
+    print('[LIVE_RECON] started');
     final repository = ExecutionRepository(database);
     final local = await repository.loadOpenOrders();
     final remoteRows = await client.openOrders();
     final remoteIds =
         remoteRows.map((row) => '${row['clientOrderId']}').toSet();
+    print(
+        '[LIVE_RECON] localOpen=${local.length} remoteOpen=${remoteIds.length}');
     var recovered = 0;
 
     for (final order in local) {
@@ -49,6 +52,8 @@ class LiveReconciliationService {
         executedQuantity: response.executedQuantity,
         quoteQuantity: response.cumulativeQuoteQuantity,
       );
+      print(
+          '[LIVE_RECON] order=${order.clientOrderId} status=${response.status} executed=${response.executedQuantity}');
       if (response.executedQuantity > Decimal.zero) {
         final trades = await client.myTrades(
           symbol: order.symbol,
@@ -65,6 +70,8 @@ class LiveReconciliationService {
     final localAfter = await repository.loadOpenOrders();
     final localIds = localAfter.map((item) => item.clientOrderId).toSet();
     if (!localIds.containsAll(remoteIds) || !remoteIds.containsAll(localIds)) {
+      print(
+          '[LIVE_RECON] MISMATCH local=${localIds.length} remote=${remoteIds.length}');
       return LiveReconciliationResult(
         ok: false,
         reason: 'LOCAL_BINANCE_ORDER_MISMATCH',
