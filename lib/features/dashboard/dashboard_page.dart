@@ -52,6 +52,7 @@ class _DashboardPageState extends State<DashboardPage> {
   StreamSubscription<LiveRuntimeEvent>? _liveSubscription;
   StreamSubscription<StrategyRuntimeEvent>? _runtimeSubscription;
   String? _startupMessage;
+  String _runMode = 'PAPER';
 
   @override
   void initState() {
@@ -88,6 +89,7 @@ class _DashboardPageState extends State<DashboardPage> {
       final values = await StrategyConfigRepository(
         widget.repository.database,
       ).load();
+      if (mounted) setState(() => _runMode = values['runMode'] ?? 'PAPER');
       if (values['runMode'] != 'PAPER') return;
       final runtime = PaperRuntimeCoordinator(
         database: widget.repository.database,
@@ -168,6 +170,7 @@ class _DashboardPageState extends State<DashboardPage> {
       onRefresh: _load,
       startupMessage: _startupMessage,
       liveRunning: _liveRuntime?.isRunning == true,
+      runMode: _runMode,
       onToggleLive: _toggleLive,
     );
   }
@@ -307,6 +310,7 @@ class DashboardView extends StatelessWidget {
     this.onRefresh,
     this.startupMessage,
     this.liveRunning = false,
+    this.runMode = 'PAPER',
     this.onToggleLive = _noop,
   });
   final DashboardSnapshot snapshot;
@@ -314,6 +318,7 @@ class DashboardView extends StatelessWidget {
   final Future<void> Function()? onRefresh;
   final String? startupMessage;
   final bool liveRunning;
+  final String runMode;
   final VoidCallback onToggleLive;
 
   @override
@@ -403,7 +408,13 @@ class DashboardView extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 20),
             child: ActionChip(
-              label: Text(liveRunning ? 'LIVE · RUNNING' : 'PAPER · SAFE'),
+              label: Text(
+                runMode == 'LIVE'
+                    ? (liveRunning ? 'LIVE · RUNNING' : 'LIVE · READY')
+                    : runMode == 'LIVE_TEST'
+                    ? 'LIVE_TEST · SAFE'
+                    : 'PAPER · SAFE',
+              ),
               onPressed: onToggleLive,
             ),
           ),
