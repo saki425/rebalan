@@ -176,6 +176,9 @@ class _DashboardPageState extends State<DashboardPage> {
     );
     if (confirmed != true || !mounted || _snapshot == null) return;
     try {
+      // PAPER and LIVE runtimes must never evaluate the same account together.
+      await _paperRuntime?.dispose();
+      _paperRuntime = null;
       final credentials = await const SecureCredentialStore().read(AccountRole.strategy);
       if (credentials == null || !credentials.isValid) throw StateError('请先配置 Strategy Account API');
       final rows = await widget.repository.database.query('accounts', columns: ['id', 'role']);
