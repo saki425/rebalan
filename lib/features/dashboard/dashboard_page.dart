@@ -19,6 +19,7 @@ import '../../core/live/binance_live_client.dart';
 import '../../core/live/credential_store.dart';
 import '../../core/live/live_execution_service.dart';
 import '../../core/live/live_trading_gate.dart';
+import '../../core/live/live_runtime_coordinator.dart';
 import '../backtest/backtest_page.dart';
 import 'dashboard_repository.dart';
 import '../funding/funding_page.dart';
@@ -47,6 +48,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Object? _error;
   StreamSubscription<MarketState>? _marketSubscription;
   PaperRuntimeCoordinator? _paperRuntime;
+  LiveRuntimeCoordinator? _liveRuntime;
   StreamSubscription<StrategyRuntimeEvent>? _runtimeSubscription;
   String? _startupMessage;
 
@@ -64,6 +66,8 @@ class _DashboardPageState extends State<DashboardPage> {
       _runtimeSubscription = null;
       await _paperRuntime?.dispose();
       _paperRuntime = null;
+      await _liveRuntime?.dispose();
+      _liveRuntime = null;
       if (mounted) setState(() => _startupMessage = null);
       final snapshot = await widget.repository.load();
       if (!mounted) return;
@@ -137,6 +141,7 @@ class _DashboardPageState extends State<DashboardPage> {
     _marketSubscription?.cancel();
     _runtimeSubscription?.cancel();
     unawaited(_paperRuntime?.dispose());
+    unawaited(_liveRuntime?.dispose());
     unawaited(widget.marketDataService.stop());
     super.dispose();
   }
@@ -154,7 +159,49 @@ class _DashboardPageState extends State<DashboardPage> {
       database: widget.repository.database,
       onRefresh: _load,
       startupMessage: _startupMessage,
+      liveRunning: _liveRuntime?.isRunning == true,
+      onToggleLive: _toggleLive,
     );
+  }
+
+  Future<void> _toggleLive() async {
+    if (_liveRuntime?.isRunning == true) {
+      await _liveRuntime!.stop();
+      if (mounted) setState(() => _startupMessage = 'LIVE 已手动停止');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => const _LiveConfirmationDialog(),
+    );
+    if (confirmed != true || !mounted || _snapshot == null) return;
+    try {
+      final credentials = await const SecureCredentialStore().read(AccountRole.strategy);
+      if (credentials == null || !credentials.isValid) throw StateError('请先配置 Strategy Account API');
+      final rows = await widget.repository.database.query('accounts', columns: ['id', 'role']);
+      final strategyId = rows.firstWhere((row) => row['role'] == 'STRATEGY')['id'] as int;
+      final values = await StrategyConfigRepository(widget.repository.database).load();
+      final live = LiveRuntimeCoordinator(
+        database: widget.repository.database,
+        marketData: widget.marketDataService,
+        credentials: credentials,
+        accountId: strategyId,
+        config: LiveRuntimeConfig(
+          enabled: true,
+          confirmation: LiveTradingConfirmation.phrase,
+          checkInterval: Duration(seconds: int.parse(values['strategyCheckInterval']!)),
+          targetBtcWeight: Decimal.parse(values['targetBTCWeight']!),
+          triggerDeviation: Decimal.parse(values['triggerDeviation']!),
+          repairRatio: Decimal.parse(values['repairRatio']!),
+        ),
+      );
+      final started = await live.start();
+      if (!started) throw StateError('LIVE 安全检查未通过，请检查 API 权限、IP 白名单和提现权限');
+      _liveRuntime = live;
+      if (mounted) setState(() => _startupMessage = 'LIVE 已启动：真实策略检查已开始');
+    } catch (error) {
+      if (mounted) setState(() => _startupMessage = 'LIVE 启动失败：$error');
+    }
   }
 }
 
@@ -222,11 +269,15 @@ class DashboardView extends StatelessWidget {
     this.database,
     this.onRefresh,
     this.startupMessage,
+    this.liveRunning = false,
+    this.onToggleLive = _noop,
   });
   final DashboardSnapshot snapshot;
   final Database? database;
   final Future<void> Function()? onRefresh;
   final String? startupMessage;
+  final bool liveRunning;
+  final VoidCallback onToggleLive;
 
   @override
   Widget build(BuildContext context) {
@@ -316,8 +367,11 @@ class DashboardView extends StatelessWidget {
             icon: const Icon(Icons.security_outlined),
           ),
           Padding(
-            padding: EdgeInsets.only(right: 20),
-            child: Chip(label: Text('PAPER · SAFE')),
+            padding: const EdgeInsets.only(right: 20),
+            child: ActionChip(
+              label: Text(liveRunning ? 'LIVE · RUNNING' : 'PAPER · SAFE'),
+              onPressed: onToggleLive,
+            ),
           ),
         ],
       ),
@@ -471,6 +525,23 @@ class DashboardView extends StatelessWidget {
       ),
     );
   }
+}
+
+void _noop() {}
+
+class _LiveConfirmationDialog extends StatelessWidget {
+  const _LiveConfirmationDialog();
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('启动真实 LIVE 策略？'),
+    content: const Text(
+      '这将允许账户2调用 Binance 真实下单接口。请确认已配置 IP 白名单、关闭提现权限，并准备使用真实资金。\n\n确认短语：ENABLE LIVE TRADING',
+    ),
+    actions: [
+      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+      FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('确认启动 LIVE')),
+    ],
+  );
 }
 
 class _Section extends StatelessWidget {
