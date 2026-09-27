@@ -215,4 +215,35 @@ void main() {
     );
     expect(apiDown.reason, 'API_NOT_CONNECTED');
   });
+
+  test(
+    'websocket disconnect pauses and a fresh reconciled state resumes',
+    () async {
+      final db = await DatabaseService.open(
+        factory: databaseFactoryFfi,
+        databasePath: inMemoryDatabasePath,
+      );
+      addTearDown(db.close);
+      Future<RecoveryReport> recover(ConnectionStatus websocket) =>
+          RecoveryCoordinator(
+            executions: ExecutionRepository(db),
+            highWaterMarks: HighWaterMarkRepository(db),
+            remote: FakeRemoteSource(
+              RemoteRecoverySnapshot(
+                accounts: accounts(),
+                openClientOrderIds: const {},
+                apiStatus: ConnectionStatus.connected,
+                websocketStatus: websocket,
+                priceUpdatedAt: now,
+              ),
+            ),
+          ).recover(now);
+      final paused = await recover(ConnectionStatus.disconnected);
+      expect(paused.tradingAllowed, isFalse);
+      expect(paused.reason, 'WEBSOCKET_NOT_CONNECTED');
+      final resumed = await recover(ConnectionStatus.connected);
+      expect(resumed.tradingAllowed, isTrue);
+      expect(resumed.reason, 'RECONCILED');
+    },
+  );
 }

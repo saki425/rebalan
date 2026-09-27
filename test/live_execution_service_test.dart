@@ -75,6 +75,125 @@ void main() {
       await database.close();
     },
   );
+
+  for (final status in const [
+    'NEW',
+    'PARTIALLY_FILLED',
+    'FILLED',
+    'CANCELED',
+  ]) {
+    test('persists Binance order state $status', () async {
+      final database = await DatabaseService.open(
+        factory: databaseFactoryFfi,
+        databasePath: inMemoryDatabasePath,
+      );
+      final strategyId =
+          (await database.query(
+                'accounts',
+                columns: ['id'],
+                where: 'role = ?',
+                whereArgs: ['STRATEGY'],
+              )).single['id']
+              as int;
+      final client = BinanceLiveClient(
+        credentials: const BinanceCredentials(
+          apiKey: 'key',
+          secretKey: 'secret',
+        ),
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/api/v3/exchangeInfo') {
+            return http.Response(_exchangeInfo, 200);
+          }
+          return http.Response(
+            '{"orderId":8,"clientOrderId":"state-$status","status":"$status","executedQty":"0.01","cummulativeQuoteQty":"600"}',
+            200,
+          );
+        }),
+      );
+      await LiveExecutionService(
+        database: database,
+        client: client,
+      ).marketOrder(
+        accountId: strategyId,
+        side: 'BUY',
+        requestedQuantity: Decimal.parse('0.01'),
+        referencePrice: Decimal.parse('60000'),
+        clientOrderId: 'state-$status',
+        idempotencyKey: 'state-key-$status',
+        reason: 'TEST',
+      );
+      expect((await database.query('orders')).single['status'], status);
+      client.close();
+      await database.close();
+    });
+  }
+
+  test(
+    'clientOrderId itself is idempotent even with a new idempotency key',
+    () async {
+      final database = await DatabaseService.open(
+        factory: databaseFactoryFfi,
+        databasePath: inMemoryDatabasePath,
+      );
+      final strategyId =
+          (await database.query(
+                'accounts',
+                columns: ['id'],
+                where: 'role = ?',
+                whereArgs: ['STRATEGY'],
+              )).single['id']
+              as int;
+      var postCount = 0;
+      final client = BinanceLiveClient(
+        credentials: const BinanceCredentials(
+          apiKey: 'key',
+          secretKey: 'secret',
+        ),
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/api/v3/exchangeInfo')
+            return http.Response(_exchangeInfo, 200);
+          postCount++;
+          return http.Response(
+            '{"orderId":9,"clientOrderId":"same-client","status":"FILLED","executedQty":"0.01","cummulativeQuoteQty":"600"}',
+            200,
+          );
+        }),
+      );
+      final service = LiveExecutionService(database: database, client: client);
+      final args = <String, Object>{
+        'accountId': strategyId,
+        'side': 'BUY',
+        'requestedQuantity': Decimal.parse('0.01'),
+        'referencePrice': Decimal.parse('60000'),
+        'clientOrderId': 'same-client',
+        'reason': 'TEST',
+      };
+      await service.marketOrder(
+        accountId: args['accountId'] as int,
+        side: args['side'] as String,
+        requestedQuantity: args['requestedQuantity'] as Decimal,
+        referencePrice: args['referencePrice'] as Decimal,
+        clientOrderId: args['clientOrderId'] as String,
+        idempotencyKey: 'first-key',
+        reason: args['reason'] as String,
+      );
+      await expectLater(
+        service.marketOrder(
+          accountId: strategyId,
+          side: 'BUY',
+          requestedQuantity: Decimal.parse('0.01'),
+          referencePrice: Decimal.parse('60000'),
+          clientOrderId: 'same-client',
+          idempotencyKey: 'second-key',
+          reason: 'TEST',
+        ),
+        throwsA(isA<DuplicateLiveExecutionException>()),
+      );
+      expect(postCount, 1);
+      client.close();
+      await database.close();
+    },
+  );
 }
 
 const _exchangeInfo =

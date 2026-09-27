@@ -22,6 +22,6 @@ void main() {
     expect(find.text('Strategy Account'), findsOneWidget);
     expect(find.text('Profit Account'), findsOneWidget);
     expect(find.text('尚未连接真实 Binance 账户 · 请先配置三个子账户 API 凭据'), findsOneWidget);
-    expect(find.textContaining(r'$200000.00'), findsOneWidget);
+    expect(find.textContaining(r'$200000.00'), findsNothing);
   });
 }
