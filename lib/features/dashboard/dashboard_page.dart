@@ -49,6 +49,7 @@ class _DashboardPageState extends State<DashboardPage> {
   StreamSubscription<MarketState>? _marketSubscription;
   PaperRuntimeCoordinator? _paperRuntime;
   LiveRuntimeCoordinator? _liveRuntime;
+  StreamSubscription<LiveRuntimeEvent>? _liveSubscription;
   StreamSubscription<StrategyRuntimeEvent>? _runtimeSubscription;
   String? _startupMessage;
 
@@ -64,6 +65,8 @@ class _DashboardPageState extends State<DashboardPage> {
       _marketSubscription = null;
       await _runtimeSubscription?.cancel();
       _runtimeSubscription = null;
+      await _liveSubscription?.cancel();
+      _liveSubscription = null;
       await _paperRuntime?.dispose();
       _paperRuntime = null;
       await _liveRuntime?.dispose();
@@ -140,6 +143,7 @@ class _DashboardPageState extends State<DashboardPage> {
   void dispose() {
     _marketSubscription?.cancel();
     _runtimeSubscription?.cancel();
+    _liveSubscription?.cancel();
     unawaited(_paperRuntime?.dispose());
     unawaited(_liveRuntime?.dispose());
     unawaited(widget.marketDataService.stop());
@@ -167,6 +171,8 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _toggleLive() async {
     if (_liveRuntime?.isRunning == true) {
       await _liveRuntime!.stop();
+      await _liveSubscription?.cancel();
+      _liveSubscription = null;
       if (mounted) setState(() => _startupMessage = 'LIVE 已手动停止');
       return;
     }
@@ -201,6 +207,10 @@ class _DashboardPageState extends State<DashboardPage> {
       final started = await live.start();
       if (!started) throw StateError('LIVE 安全检查未通过，请检查 API 权限、IP 白名单和提现权限');
       _liveRuntime = live;
+      _liveSubscription = live.events.listen((event) {
+        if (!mounted) return;
+        setState(() => _startupMessage = 'LIVE ${event.state}：${event.reason}');
+      });
       if (mounted) setState(() => _startupMessage = 'LIVE 已启动：真实策略检查已开始');
     } catch (error) {
       if (mounted) setState(() => _startupMessage = 'LIVE 启动失败：$error');
