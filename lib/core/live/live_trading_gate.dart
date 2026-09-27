@@ -21,13 +21,22 @@ class ApiPermissionSnapshot {
   final bool spotTradingEnabled;
   final bool internalTransferEnabled;
 
-  factory ApiPermissionSnapshot.fromBinance(Map<String, dynamic> json) =>
-      ApiPermissionSnapshot(
-        ipRestricted: json['ipRestrict'] == true,
-        withdrawalsEnabled: json['enableWithdrawals'] == true,
-        spotTradingEnabled: json['enableSpotAndMarginTrading'] == true,
-        internalTransferEnabled: json['enableInternalTransfer'] == true,
-      );
+  factory ApiPermissionSnapshot.fromBinance(Map<String, dynamic> json) {
+    // Binance has returned both names across API/account variants. The web
+    // console's "Universal Transfer" permission is exposed as
+    // `permitsUniversalTransfer`, while some keys expose
+    // `enableInternalTransfer`. Either one is sufficient for an internal
+    // sub-account transfer; withdrawals remain independently blocked.
+    final internalTransfer =
+        json['enableInternalTransfer'] == true ||
+        json['permitsUniversalTransfer'] == true;
+    return ApiPermissionSnapshot(
+      ipRestricted: json['ipRestrict'] == true,
+      withdrawalsEnabled: json['enableWithdrawals'] == true,
+      spotTradingEnabled: json['enableSpotAndMarginTrading'] == true,
+      internalTransferEnabled: internalTransfer,
+    );
+  }
 }
 
 class LiveGateRequest {

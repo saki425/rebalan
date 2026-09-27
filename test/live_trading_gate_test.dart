@@ -19,6 +19,16 @@ void main() {
     expect(missing.spotTradingEnabled, isFalse);
   });
 
+  test('accepts Binance Universal Transfer permission variant', () {
+    final permissions = ApiPermissionSnapshot.fromBinance({
+      'ipRestrict': true,
+      'enableWithdrawals': false,
+      'enableSpotAndMarginTrading': true,
+      'permitsUniversalTransfer': true,
+    });
+    expect(permissions.internalTransferEnabled, isTrue);
+  });
+
   const safePermissions = ApiPermissionSnapshot(
     ipRestricted: true,
     withdrawalsEnabled: false,
