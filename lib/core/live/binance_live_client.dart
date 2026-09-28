@@ -81,7 +81,7 @@ class BinanceLiveClient {
         .get(uri)
         .timeout(const Duration(seconds: 15));
     print(
-      '[BINANCE_HTTP] GET /api/v3/exchangeInfo status=${response.statusCode} body=${response.body}',
+      '[BINANCE_HTTP] GET /api/v3/exchangeInfo status=${response.statusCode}',
     );
     _ensureSuccess(response);
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -286,9 +286,7 @@ class BinanceLiveClient {
           .timeout(const Duration(seconds: 15)),
       _ => throw ArgumentError.value(method, 'method'),
     };
-    print(
-      '[BINANCE_HTTP] $method $path status=${response.statusCode} body=${response.body}',
-    );
+    print('[BINANCE_HTTP] $method $path status=${response.statusCode}');
     _ensureSuccess(response);
     return response;
   }
