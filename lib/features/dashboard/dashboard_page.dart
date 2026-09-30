@@ -349,6 +349,11 @@ class DashboardView extends StatelessWidget {
         : Decimal.one;
     final total = portfolios.valueAccounts(snapshot.accounts, valuationPrice);
     final strategyValue = portfolios.valueAccount(strategy, valuationPrice);
+    final triggerPrices = _calculateTriggerPrices(
+      strategy: strategy,
+      target: snapshot.config.targetBtcWeight,
+      deviation: snapshot.config.triggerDeviation,
+    );
     return Scaffold(
       appBar: AppBar(
         title: const Text('BTC / USDT Rebalance'),
@@ -553,6 +558,18 @@ class DashboardView extends StatelessWidget {
                     label: '触发区间',
                     value:
                         '${_percent(snapshot.config.lowerTrigger)} — ${_percent(snapshot.config.upperTrigger)}',
+                  ),
+                  _Metric(
+                    label: '上涨触发 SELL 价格',
+                    value: triggerPrices.upper == null
+                        ? '--'
+                        : _money(triggerPrices.upper!),
+                  ),
+                  _Metric(
+                    label: '下跌触发 BUY 价格',
+                    value: triggerPrices.lower == null
+                        ? '--'
+                        : _money(triggerPrices.lower!),
                   ),
                   _Metric(
                     label: '修复比例',
@@ -1033,6 +1050,26 @@ class _ErrorView extends StatelessWidget {
       child: Text('数据库初始化失败\n$message', textAlign: TextAlign.center),
     ),
   );
+}
+
+({Decimal? upper, Decimal? lower}) _calculateTriggerPrices({
+  required AccountBalance strategy,
+  required Decimal target,
+  required Decimal deviation,
+}) {
+  final btc = strategy.btc;
+  final usdt = strategy.usdt;
+  final upperWeight = target + deviation;
+  final lowerWeight = target - deviation;
+  if (btc <= Decimal.zero ||
+      usdt < Decimal.zero ||
+      upperWeight >= Decimal.one ||
+      lowerWeight <= Decimal.zero) {
+    return (upper: null, lower: null);
+  }
+  final upper = upperWeight * usdt / ((Decimal.one - upperWeight) * btc);
+  final lower = lowerWeight * usdt / ((Decimal.one - lowerWeight) * btc);
+  return (upper: upper, lower: lower);
 }
 
 String _number(Decimal value, int decimals) =>
