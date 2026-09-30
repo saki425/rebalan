@@ -1067,8 +1067,10 @@ class _ErrorView extends StatelessWidget {
       lowerWeight <= Decimal.zero) {
     return (upper: null, lower: null);
   }
-  final upper = upperWeight * usdt / ((Decimal.one - upperWeight) * btc);
-  final lower = lowerWeight * usdt / ((Decimal.one - lowerWeight) * btc);
+  final upper = (upperWeight * usdt / ((Decimal.one - upperWeight) * btc))
+      .toDecimal(scaleOnInfinitePrecision: 18);
+  final lower = (lowerWeight * usdt / ((Decimal.one - lowerWeight) * btc))
+      .toDecimal(scaleOnInfinitePrecision: 18);
   return (upper: upper, lower: lower);
 }
 
