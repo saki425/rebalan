@@ -236,6 +236,9 @@ class _DashboardPageState extends State<DashboardPage> {
       _liveRuntime = live;
       _liveSubscription = live.events.listen((event) {
         if (!mounted) return;
+        if (event.state == 'FILLED') {
+          unawaited(_refreshDashboardBalances());
+        }
         final status = switch (event.state) {
           'NO_TRADE' || 'LIVE_RECONCILED' => StrategyStatus.running,
           'ORDER_SUBMITTED' => StrategyStatus.waitingOrder,
@@ -256,6 +259,26 @@ class _DashboardPageState extends State<DashboardPage> {
       if (mounted) setState(() => _startupMessage = 'LIVE 已启动：真实策略检查已开始');
     } catch (error) {
       if (mounted) setState(() => _startupMessage = 'LIVE 启动失败：$error');
+    }
+  }
+
+  Future<void> _refreshDashboardBalances() async {
+    try {
+      final fresh = await widget.repository.load();
+      if (!mounted || _snapshot == null) return;
+      setState(() {
+        _snapshot = _withAccounts(
+          _snapshot!,
+          fresh.accounts,
+          profitWithdrawn: fresh.profitWithdrawn,
+          highWaterMark: fresh.highWaterMark,
+          totalFees: fresh.totalFees,
+        );
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _startupMessage = '成交后余额刷新失败：$error');
+      }
     }
   }
 }
@@ -299,6 +322,30 @@ DashboardSnapshot _withStrategyStatus(
   maxDrawdown: snapshot.maxDrawdown,
   cagr: snapshot.cagr,
   totalFees: snapshot.totalFees,
+  isDemo: snapshot.isDemo,
+);
+
+DashboardSnapshot _withAccounts(
+  DashboardSnapshot snapshot,
+  List<AccountBalance> accounts, {
+  required Decimal profitWithdrawn,
+  required Decimal highWaterMark,
+  required Decimal totalFees,
+}) => DashboardSnapshot(
+  btcPrice: snapshot.btcPrice,
+  change24h: snapshot.change24h,
+  websocketStatus: snapshot.websocketStatus,
+  apiStatus: snapshot.apiStatus,
+  lastRestCalibration: snapshot.lastRestCalibration,
+  accounts: accounts,
+  strategyStatus: snapshot.strategyStatus,
+  config: snapshot.config,
+  strategyProfit: snapshot.strategyProfit,
+  profitWithdrawn: profitWithdrawn,
+  highWaterMark: highWaterMark,
+  maxDrawdown: snapshot.maxDrawdown,
+  cagr: snapshot.cagr,
+  totalFees: totalFees,
   isDemo: snapshot.isDemo,
 );
 
