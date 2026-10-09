@@ -90,6 +90,10 @@ class _DashboardPageState extends State<DashboardPage> {
         widget.repository.database,
       ).load();
       if (mounted) setState(() => _runMode = values['runMode'] ?? 'PAPER');
+      if (values['runMode'] == 'LIVE') {
+        await _toggleLive(requireConfirmation: false);
+        return;
+      }
       if (values['runMode'] != 'PAPER') return;
       final runtime = PaperRuntimeCoordinator(
         database: widget.repository.database,
@@ -175,7 +179,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Future<void> _toggleLive() async {
+  Future<void> _toggleLive({bool requireConfirmation = true}) async {
     if (_liveRuntime?.isRunning == true) {
       await _liveRuntime!.stop();
       await _liveSubscription?.cancel();
@@ -183,11 +187,15 @@ class _DashboardPageState extends State<DashboardPage> {
       if (mounted) setState(() => _startupMessage = 'LIVE 已手动停止');
       return;
     }
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => const _LiveConfirmationDialog(),
-    );
-    if (confirmed != true || !mounted || _snapshot == null) return;
+    if (requireConfirmation) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => const _LiveConfirmationDialog(),
+      );
+      if (confirmed != true || !mounted || _snapshot == null) return;
+    } else if (!mounted || _snapshot == null) {
+      return;
+    }
     try {
       // PAPER and LIVE runtimes must never evaluate the same account together.
       await _paperRuntime?.dispose();
