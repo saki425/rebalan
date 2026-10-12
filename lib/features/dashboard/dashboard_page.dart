@@ -51,12 +51,18 @@ class _DashboardPageState extends State<DashboardPage> {
   LiveRuntimeCoordinator? _liveRuntime;
   StreamSubscription<LiveRuntimeEvent>? _liveSubscription;
   StreamSubscription<StrategyRuntimeEvent>? _runtimeSubscription;
+  Timer? _balanceRefreshTimer;
+  bool _isRefreshingBalances = false;
   String? _startupMessage;
   String _runMode = 'PAPER';
 
   @override
   void initState() {
     super.initState();
+    _balanceRefreshTimer = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) => unawaited(_refreshDashboardBalances()),
+    );
     _load();
   }
 
@@ -151,6 +157,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   void dispose() {
+    _balanceRefreshTimer?.cancel();
     _marketSubscription?.cancel();
     _runtimeSubscription?.cancel();
     _liveSubscription?.cancel();
@@ -171,7 +178,8 @@ class _DashboardPageState extends State<DashboardPage> {
     return DashboardView(
       snapshot: _snapshot!,
       database: widget.repository.database,
-      onRefresh: _load,
+      onRefresh: _refreshDashboardBalances,
+      onConfigurationChanged: _load,
       startupMessage: _startupMessage,
       liveRunning: _liveRuntime?.isRunning == true,
       runMode: _runMode,
@@ -271,6 +279,8 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _refreshDashboardBalances() async {
+    if (_isRefreshingBalances) return;
+    _isRefreshingBalances = true;
     try {
       final fresh = await widget.repository.load();
       if (!mounted || _snapshot == null) return;
@@ -285,8 +295,10 @@ class _DashboardPageState extends State<DashboardPage> {
       });
     } catch (error) {
       if (mounted) {
-        setState(() => _startupMessage = '成交后余额刷新失败：$error');
+        setState(() => _startupMessage = '账户余额刷新失败：$error');
       }
+    } finally {
+      _isRefreshingBalances = false;
     }
   }
 }
@@ -378,6 +390,7 @@ class DashboardView extends StatelessWidget {
     required this.snapshot,
     this.database,
     this.onRefresh,
+    this.onConfigurationChanged,
     this.startupMessage,
     this.liveRunning = false,
     this.runMode = 'PAPER',
@@ -386,6 +399,7 @@ class DashboardView extends StatelessWidget {
   final DashboardSnapshot snapshot;
   final Database? database;
   final Future<void> Function()? onRefresh;
+  final Future<void> Function()? onConfigurationChanged;
   final String? startupMessage;
   final bool liveRunning;
   final String runMode;
@@ -463,7 +477,7 @@ class DashboardView extends StatelessWidget {
                     ),
                   ),
                 );
-                await onRefresh?.call();
+                await (onConfigurationChanged ?? onRefresh)?.call();
               },
               icon: const Icon(Icons.tune),
             ),
@@ -476,7 +490,7 @@ class DashboardView extends StatelessWidget {
                   builder: (_) => const CredentialsPage(),
                 ),
               );
-              await onRefresh?.call();
+              await (onConfigurationChanged ?? onRefresh)?.call();
             },
             icon: const Icon(Icons.security_outlined),
           ),
